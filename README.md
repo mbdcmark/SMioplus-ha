@@ -140,6 +140,9 @@ Entity options:
 - `update_interval: seconds` (how often the card is read, default 30s; applies
   to every entity that has a value to read, so all of them except the buttons)
 
+An entity named without a channel and without `channels` or `chan_range` --
+just `relay:` -- means every channel that type has.
+
 `chan_range` and `channels` are alternatives; when both are given, `channels`
 wins. Channels the card does not have are reported in the log and skipped, as
 are unknown entity names and stack levels outside 0..7.
@@ -166,3 +169,31 @@ Two changes are visible in your entity list.
    the same channel a second time. The old registry entries are orphaned by the
    upgrade; remove any leftover duplicates once under Settings, Devices &
    services, Entities.
+
+
+### Polling faster than the default
+
+Inputs are read every 30 seconds unless you say otherwise, which is too slow to
+test an opto input by hand. Give that entity its own interval:
+
+```yaml
+SMioplus:
+    - stack: 0
+      opto:
+        update_interval: 1
+      relay:
+      adc:
+      opto_cnt:
+      opto_cnt_rst:
+      dac:
+      od:
+```
+
+Naming any entity means only the named entities are loaded, which is why the
+rest are listed too -- each on its own line, with no options, so they keep the
+30 second default.
+
+Each distinct interval gets its own poller, so the eight opto channels are read
+in a sweep of their own rather than dragging the other forty along at 1 second.
+Do not set an interval shorter than the sweep it drives: the card needs about
+50ms between transactions, so eight channels need roughly half a second.

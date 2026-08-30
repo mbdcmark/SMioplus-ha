@@ -81,10 +81,15 @@ def _parse_chan_range(value):
     return list(range(int(start), int(end) + 1))
 
 
+def _chan_count(entity_type):
+    """How many channels the card has of this entity type."""
+    return int(SM_MAP[PLATFORM_FOR_TYPE[entity_type]][entity_type]["chan_no"])
+
+
 def _load(hass, config, stack, entity_type, chans, update_interval):
     """Queue one platform load per requested channel."""
     platform = PLATFORM_FOR_TYPE[entity_type]
-    chan_no = SM_MAP[platform][entity_type]["chan_no"]
+    chan_no = _chan_count(entity_type)
     for chan in chans:
         if not 1 <= chan <= chan_no:
             _LOGGER.error(
@@ -146,6 +151,10 @@ def _setup_entity(hass, config, stack, entity_key, options):
             _LOGGER.error("%s: chan_range %r is not of the form \"start..end\"",
                           entity_key, chan_range)
             return
+    elif entity_key in PLATFORM_FOR_TYPE:
+        # A bare `relay:` means every channel that type has.
+        entity_type = entity_key
+        chans = None
     else:
         entity_type, _, chan = entity_key.rpartition("_")
         try:
@@ -160,6 +169,9 @@ def _setup_entity(hass, config, stack, entity_key, options):
             entity_type, ", ".join(sorted(PLATFORM_FOR_TYPE)),
         )
         return
+
+    if chans is None:
+        chans = range(1, _chan_count(entity_type) + 1)
 
     _load(hass, config, stack, entity_type, chans, update_interval)
 
