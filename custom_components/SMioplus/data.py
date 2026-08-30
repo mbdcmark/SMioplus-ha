@@ -31,10 +31,11 @@ SM_MAP = {
     "binary_sensor": {
         "opto": {
                 "chan_no": 8,
-                # An input is useless at the 30s default; ten reads a second
-                # keeps a hand-thrown switch feeling immediate.  Overridable
-                # per entity from configuration.yaml.
-                "update_interval": 0.1,
+                # An input is useless at the 30s default.  Eight channels read
+                # one at a time measure ~0.11s, so this is about as fast as it
+                # goes without a bulk read.  Overridable per entity from
+                # configuration.yaml.
+                "update_interval": 0.15,
                 "com": {
                     "get": "getOptoCh",
                 },
@@ -54,6 +55,10 @@ SM_MAP = {
                 "com": {
                     "get": "getOptoCount",
                 },
+                # The card counts nothing until an edge is selected, so
+                # getOptoCount would return 0 for ever.  0 none, 1 rising,
+                # 2 falling, 3 both.
+                "init": {"cfgOptoEdgeCount": 1},
         },
         "adc": {
                 "chan_no": 8,

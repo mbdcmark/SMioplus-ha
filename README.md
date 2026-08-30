@@ -173,7 +173,7 @@ Two changes are visible in your entity list.
 
 ### Polling intervals
 
-Most entities are read every 30 seconds. The opto inputs are read every 0.1
+Most entities are read every 30 seconds. The opto inputs are read every 0.15
 seconds, because an input at 30 seconds feels broken -- that default lives with
 the rest of the card description, as `update_interval` on the entity in
 `custom_components/SMioplus/data.py`, and needs no configuration.
@@ -205,3 +205,21 @@ them and eight channels read in a few milliseconds; 0.1 second intervals are
 workable. If a sweep does overrun its interval the log says so once, naming the
 measured time. Should reads start failing on a long or noisy bus, raise
 `BUS_SETTLE` in `custom_components/SMioplus/const.py`.
+
+
+### Counting opto pulses
+
+The card counts edges in hardware, so `opto_cnt` catches pulses the polled
+`opto` binary sensor would sleep through. It counts nothing until an edge is
+selected, which the integration does for each channel at startup by way of the
+entity's `init` block in `data.py`:
+
+```python
+"init": {"cfgOptoEdgeCount": 1},   # 0 none, 1 rising, 2 falling, 3 both
+```
+
+Rising gives one count per pulse; `3` counts both flanks and so counts twice.
+The matching `opto_cnt_rst` button zeroes a channel.
+
+`init` is generic: any entity may name vendor calls that have to run once,
+before the channel will work.

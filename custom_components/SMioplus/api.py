@@ -77,27 +77,41 @@ class SMChannel:
         self.stack = stack
         self.chan = chan
         self.key = (stack, entity_type, chan)
-        self._get = self._bind(spec, "get", 0)
-        self._set = self._bind(
+        self._get = self._bind_com(spec, "get", 0)
+        self._set = self._bind_com(
             spec, "set", _SET_VALUE_ARGS.get(platform, _DEFAULT_SET_VALUE_ARGS)
         )
+        self._configure(spec)
 
     def __str__(self):
         return f"{self.entity_type}_{self.chan} on stack {self.stack}"
 
-    def _bind(self, spec, action, value_args):
+    def _configure(self, spec):
+        """Run the one-off commands this channel needs before it works.
+
+        The edge counters are the reason this exists: the card counts nothing
+        until an edge is selected, so getOptoCount would return 0 forever.
+        """
+        for name, value in spec.get("init", {}).items():
+            args = tuple(value) if isinstance(value, (list, tuple)) else (value,)
+            self._bind(name, len(args))(*args)
+
+    def _bind_com(self, spec, action, value_args):
         name = spec["com"].get(action)
         if not name or name == COM_NOGET:
             # The card cannot do this; the entity falls back to reporting the
             # last value it wrote.
             return None
+        return self._bind(name, value_args)
 
+    def _bind(self, name, value_args):
+        """Resolve a vendor function into a call for this channel."""
         target = _target(self.stack)
         try:
             func = getattr(target, name)
         except AttributeError:
             raise SMApiError(
-                f"{API.__name__} has no {action} command {name!r}, needed by {self}"
+                f"{API.__name__} has no command {name!r}, needed by {self}"
             ) from None
 
         # A module level function carries the stack level; a bound method does
@@ -123,7 +137,7 @@ class SMChannel:
 
         shape = [*(["stack"] if prefix else []), *(["chan"] if uses_chan else [])]
         shape += ["value"] * value_args
-        _LOGGER.debug("%s: %s -> %s(%s)", self, action, name, ", ".join(shape))
+        _LOGGER.debug("%s: %s(%s)", self, name, ", ".join(shape))
 
         chan_arg = (self.chan,) if uses_chan else ()
 
