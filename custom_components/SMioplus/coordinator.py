@@ -64,7 +64,11 @@ class SMCoordinator(DataUpdateCoordinator):
         """Read every channel. Runs in an executor; each call locks the bus."""
         started = time.monotonic()
         values = {}
-        for index, (key, channel) in enumerate(self._channels.items()):
+        # Snapshot: entities keep registering from the event loop while this
+        # runs in an executor thread, and iterating the live dict raises
+        # "dictionary changed size during iteration" right after a restart.
+        # Anything added mid-sweep is picked up by the next one.
+        for index, (key, channel) in enumerate(list(self._channels.items())):
             if index and BUS_SETTLE:
                 time.sleep(BUS_SETTLE)
             try:
@@ -74,7 +78,7 @@ class SMCoordinator(DataUpdateCoordinator):
                 _LOGGER.error("Reading %s failed: %s", channel, ex)
                 values[key] = None
 
-        if self._channels and all(value is None for value in values.values()):
+        if values and all(value is None for value in values.values()):
             raise UpdateFailed(f"Card on stack {self.stack} did not answer")
 
         elapsed = time.monotonic() - started
