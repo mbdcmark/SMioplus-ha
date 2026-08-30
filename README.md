@@ -121,6 +121,17 @@ SMioplus:
 [//]: # (__CUSTOM_README__ START)
 [//]: # (__CUSTOM_README__ END)
 
+### Card numbering
+
+The jumpers, the I2C addresses and the `stack:` option all count cards from 0.
+The entities are named from 1: the card on stack 0 gives `smio1_relay_1`, and
+the card on stack 7 gives `smio8_relay_1`. `NAME_STACK_OFFSET` in `data.py` is
+what does that; set it to 0 to have the names match the jumpers again.
+
+Log messages name the stack level, not the entity prefix, because they are
+about the hardware -- a complaint about "stack 0" is about the card named
+`smio1`.
+
 ### `configuration.yaml` entities
 
 Possible entities:

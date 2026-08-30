@@ -22,6 +22,7 @@ from .const import (  # noqa: F401  (re-exported for compatibility)
 
 DOMAIN = data.DOMAIN
 NAME_PREFIX = data.NAME_PREFIX
+NAME_STACK_OFFSET = data.NAME_STACK_OFFSET
 SM_MAP = data.SM_MAP
 SM_API = data.API
 PLATFORM_FOR_TYPE = data.PLATFORM_FOR_TYPE
@@ -57,7 +58,7 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 def _entity_name(stack, entity_type, chan):
-    return f"{NAME_PREFIX}{stack}_{entity_type}_{chan}"
+    return f"{NAME_PREFIX}{stack + NAME_STACK_OFFSET}_{entity_type}_{chan}"
 
 
 def _discovery_info(stack, entity_type, chan, update_interval):

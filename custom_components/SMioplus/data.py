@@ -21,6 +21,12 @@ BASE_ADDRESS = 0x28
 DOMAIN = "SMioplus"
 NAME_PREFIX = "smio"
 
+# What to add to the stack level when naming entities.  The jumpers, the I2C
+# addresses and the `stack:` option all count cards from 0; with this at 1 the
+# entities are named smio1 to smio8 instead of smio0 to smio7.  Set it to 0 to
+# have the names match the jumpers again.
+NAME_STACK_OFFSET = 1
+
 # Stack levels selectable with the card's jumpers.
 MIN_STACK = 0
 MAX_STACK = 7
