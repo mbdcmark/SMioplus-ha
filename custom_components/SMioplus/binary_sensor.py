@@ -21,7 +21,7 @@ async def async_setup_platform(hass, config, add_devices, discovery_info=None):
     )
 
 
-class BinarySensor(SMPolledEntity):
+class BinarySensor(SMPolledEntity, BinarySensorEntity):
     def __init__(self, channel, name, coordinator):
         super().__init__(channel, name, coordinator, DEFAULT_ICONS)
         self._attr_device_class = SM_MAP[channel.entity_type].get("device_class")

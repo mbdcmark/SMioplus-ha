@@ -21,7 +21,7 @@ async def async_setup_platform(hass, config, add_devices, discovery_info=None):
     )
 
 
-class Sensor(SMPolledEntity):
+class Sensor(SMPolledEntity, SensorEntity):
     def __init__(self, channel, name, coordinator):
         super().__init__(channel, name, coordinator, DEFAULT_ICONS)
         spec = SM_MAP[channel.entity_type]
