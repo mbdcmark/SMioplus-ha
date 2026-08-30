@@ -12,6 +12,7 @@ CONF_CHAN = "chan"
 CONF_CHANNELS = "channels"
 CONF_CHAN_RANGE = "chan_range"
 CONF_UPDATE_INTERVAL = "update_interval"  # In seconds
+CONF_INTERVALS = "intervals"  # Per entity type, for a whole card
 
 # Marker for cards whose hardware cannot be read back; the last written value
 # is reported instead.

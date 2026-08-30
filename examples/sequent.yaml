@@ -1,0 +1,44 @@
+# Include this from configuration.yaml with:
+#
+#   SMioplus: !include sequent.yaml
+#
+# Eight cards, with the polling intervals in one place.  The anchor is plain
+# YAML: `&intervals` names the block, `*intervals` reuses it, so a change to
+# the first card applies to all of them.
+#
+# Intervals are in seconds and may be fractional.  Naming a type here does not
+# narrow down which entities are loaded -- every channel of every type on the
+# card comes up either way.  Leave a type out and it keeps the default from
+# the card description.
+#
+# opto_cnt_rst is a button and is never read, so it has no interval.
+
+- stack: 1
+  intervals: &intervals
+    opto: 0.1          # the inputs; anything slower feels broken
+    opto_cnt: 60       # a hardware counter, so nothing is missed between reads
+    adc: 60            # 0-10V measurements
+    relay: 60          # written by Home Assistant; polled only to confirm
+    dac: 60            # 0-10V dimmers
+    od: 60             # open drain PWM dimmers
+
+- stack: 2
+  intervals: *intervals
+
+- stack: 3
+  intervals: *intervals
+
+- stack: 4
+  intervals: *intervals
+
+- stack: 5
+  intervals: *intervals
+
+- stack: 6
+  intervals: *intervals
+
+- stack: 7
+  intervals: *intervals
+
+- stack: 8
+  intervals: *intervals

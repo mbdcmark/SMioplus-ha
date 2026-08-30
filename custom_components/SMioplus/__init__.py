@@ -12,6 +12,7 @@ from .const import (  # noqa: F401  (re-exported for compatibility)
     CONF_CHAN,
     CONF_CHAN_RANGE,
     CONF_CHANNELS,
+    CONF_INTERVALS,
     CONF_NAME,
     CONF_STACK,
     CONF_TYPE,
@@ -37,6 +38,17 @@ ENTITY_SCHEMA = vol.Schema(
         vol.Optional(CONF_UPDATE_INTERVAL): vol.All(
             vol.Coerce(float), vol.Range(min=MIN_UPDATE_INTERVAL)
         ),
+    }
+)
+
+# How often each type is read, for every channel of it on this card.  Unlike
+# naming an entity, this does not narrow down which entities are loaded.
+INTERVALS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(entity_type): vol.All(
+            vol.Coerce(float), vol.Range(min=MIN_UPDATE_INTERVAL)
+        )
+        for entity_type in PLATFORM_FOR_TYPE
     }
 )
 
@@ -114,7 +126,7 @@ def _load(hass, config, stack, entity_type, chans, update_interval):
         )
 
 
-def _load_whole_card(hass, config, stack):
+def _load_whole_card(hass, config, stack, intervals):
     """Load every entity the card has."""
     for platform, entities in SM_MAP.items():
         for entity_type, spec in entities.items():
@@ -122,11 +134,12 @@ def _load_whole_card(hass, config, stack):
                 continue
             _load(
                 hass, config, stack, entity_type,
-                range(1, int(spec["chan_no"]) + 1), None,
+                range(1, int(spec["chan_no"]) + 1),
+                intervals.get(entity_type),
             )
 
 
-def _setup_entity(hass, config, stack, entity_key, options):
+def _setup_entity(hass, config, stack, entity_key, options, intervals):
     """Work out which channels `entity_key` asks for, and load them."""
     try:
         options = ENTITY_SCHEMA(options or {})
@@ -179,6 +192,9 @@ def _setup_entity(hass, config, stack, entity_key, options):
     if chans is None:
         chans = range(1, _chan_count(entity_type) + 1)
 
+    if update_interval is None:
+        update_interval = intervals.get(entity_type)
+
     _load(hass, config, stack, entity_type, chans, update_interval)
 
 
@@ -187,7 +203,7 @@ async def async_setup(hass, config):
 
     card_configs = config.get(DOMAIN)
     if not card_configs:
-        _load_whole_card(hass, config, data.MIN_STACK)
+        _load_whole_card(hass, config, data.MIN_STACK, {})
         return True
 
     for card_config in card_configs:
@@ -197,10 +213,16 @@ async def async_setup(hass, config):
         stack = stack_from_card(
             int(card_config.pop(CONF_STACK, card_from_stack(data.MIN_STACK)))
         )
+        try:
+            intervals = INTERVALS_SCHEMA(card_config.pop(CONF_INTERVALS, None) or {})
+        except vol.Invalid as err:
+            _LOGGER.error("Bad intervals for card %s: %s", card_from_stack(stack), err)
+            intervals = {}
+
         if not card_config:
-            _load_whole_card(hass, config, stack)
+            _load_whole_card(hass, config, stack, intervals)
             continue
         for entity_key, options in card_config.items():
-            _setup_entity(hass, config, stack, entity_key, options)
+            _setup_entity(hass, config, stack, entity_key, options, intervals)
 
     return True

@@ -376,3 +376,29 @@ Worth knowing because the vendor's own tool gates its PWM frequency commands
 outputs run at a fixed frequency. That is the only version-dependent behaviour
 in the vendor sources, and this integration does not use those commands, so
 older cards lose nothing here.
+
+
+### Setting the intervals from configuration.yaml
+
+Editing `data.py` does not survive a HACS update, so how often each type is
+read can be set per card with an `intervals` block:
+
+```yaml
+SMioplus:
+  - stack: 1
+    intervals:
+      opto: 0.1
+      adc: 30
+```
+
+Unlike naming an entity, this does not narrow down which entities are loaded:
+every channel of every type still comes up. A type left out keeps the default
+from the card description, and a per-entity `update_interval` still wins over
+both.
+
+`examples/sequent.yaml` has the whole thing for eight cards, with a YAML anchor
+so the intervals are written once. Point `configuration.yaml` at it with:
+
+```yaml
+SMioplus: !include sequent.yaml
+```
