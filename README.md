@@ -313,8 +313,10 @@ bits applied, the whole byte written, and the result read back and retried the
 way a single write is. The relays then switch together, and eight cards cost
 eight transactions rather than sixty-four.
 
-A single switch waits the same window before anything happens, which is 50ms
-and not worth noticing. Types without a `set_all` -- the dimmers -- are written
+A single switch waits the same window before anything happens. Home Assistant
+fires the eight service calls in one event loop tick, so they are all queued
+long before it expires; the window only has to survive the scheduling, which is
+why it is 10ms rather than something a person could feel. Types without a `set_all` -- the dimmers -- are written
 one at a time as before.
 
 

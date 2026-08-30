@@ -48,10 +48,10 @@ WRITE_ATTEMPTS = 3
 
 # Seconds to gather channel writes before sending them as one transaction.
 # Home Assistant calls turn_on and turn_off one entity at a time, so switching
-# eight relays arrives as eight calls; waiting this long turns them into a
-# single write and they switch together.  Long enough to catch the batch,
-# short enough not to be felt on a single switch.
-BATCH_WINDOW = 0.05
+# eight relays arrives as eight calls -- but it fires them in one event loop
+# tick, so they are all queued before this window has a chance to expire.  It
+# only has to survive the scheduling, not wait for a person.
+BATCH_WINDOW = 0.01
 
 # How many sweeps in a row a channel may fail before it is reported
 # unavailable.  A single failed read is usually the bus being busy, not the
