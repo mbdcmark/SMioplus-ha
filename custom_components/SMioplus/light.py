@@ -51,7 +51,12 @@ class Light(SMWritableEntity, LightEntity, RestoreEntity):
     def _to_brightness(self, value):
         span = self._sm_full - self._sm_off
         share = (float(value) - self._sm_off) / span if span else 0.0
-        return round(min(max(share, 0.0), 1.0) * MAX_BRIGHTNESS)
+        share = min(max(share, 0.0), 1.0)
+        if share <= 0:
+            return 0
+        # 0.01V of a 10V range rounds to nothing, and a light that is on must
+        # not report a brightness of zero.
+        return max(1, round(share * MAX_BRIGHTNESS))
 
     def _to_native(self, brightness):
         span = self._sm_full - self._sm_off
