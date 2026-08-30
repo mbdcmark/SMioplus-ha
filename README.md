@@ -147,8 +147,10 @@ just `relay:` -- means every channel that type has.
 wins. Channels the card does not have are reported in the log and skipped, as
 are unknown entity names and stack levels outside 0..7.
 
-All entities of one stack level are grouped under a single device, so you can
-find them together under Settings, Devices & services.
+Entities are not grouped under a device. Home Assistant only lets an entity
+join the device registry by way of a config entry, and this integration is
+configured from YAML; grouping them anyway earned a deprecation warning on
+every start. It returns with a config flow.
 
 Each card is read in a single pass per interval rather than once per entity, so
 a card with 48 entities issues one sweep of I2C transactions every 30 seconds

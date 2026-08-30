@@ -7,7 +7,6 @@ that used to live in button.py, sensor.py, switch.py and number.py.
 import logging
 
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import SMChannel
@@ -20,7 +19,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
 )
 from .coordinator import async_get_coordinator
-from .data import DOMAIN, FULL_NAME, LINK, MANUFACTURER, NAME_PREFIX, SM_MAP
+from .data import DOMAIN, NAME_PREFIX, SM_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,13 +90,12 @@ class SMEntityMixin:
         self._attr_name = name or (
             f"{NAME_PREFIX}{channel.stack}_{channel.entity_type}_{channel.chan}"
         )
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, str(channel.stack))},
-            manufacturer=MANUFACTURER,
-            model=FULL_NAME,
-            name=f"{FULL_NAME} {channel.stack}",
-            configuration_url=LINK,
-        )
+        # No device_info on purpose.  Home Assistant only lets an entity join
+        # the device registry through a config entry, and this integration is
+        # configured from YAML, so grouping the channels of a card under one
+        # device earned a deprecation warning on every start and would have
+        # stopped working in 2027.8.  It comes back with a config flow, not
+        # before.
 
         self._sm_icons = {**default_icons, **spec.get("icon", {})}
         self._attr_icon = self._sm_icons.get("off")
