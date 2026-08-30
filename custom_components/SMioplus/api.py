@@ -25,7 +25,7 @@ try:
 except ImportError:  # the vendor library depends on it, so this is unusual
     smbus2 = None
 
-from .const import COM_NOGET, USE_DIRECT_BUS, WRITE_SETTLE
+from .const import COM_NOGET, USE_DIRECT_BUS, WRITE_ATTEMPTS, WRITE_SETTLE
 from .data import API, BASE_ADDRESS, I2C_BUS, SM_MAP
 
 _LOGGER = logging.getLogger(__name__)
@@ -217,6 +217,8 @@ class SMChannel:
             if self._get_all is not None
             else None
         )
+        # Some commands are fire and forget and have to be read back.
+        self._verify = bool(spec.get("verify"))
         self._configure(spec)
 
     def __str__(self):
@@ -314,7 +316,39 @@ class SMChannel:
             raise SMApiError(f"{self} cannot be read")
         return self._get()
 
+    def read_now(self):
+        """This channel's value, by whichever path is quickest."""
+        if self._port is not None:
+            return self.decode(self._port.read())
+        return self._get()
+
     def set(self, *values):
         if self._set is None:
             raise SMApiError(f"{self} cannot be written")
-        return self._set(*values)
+        if not self._verify or not values:
+            return self._set(*values)
+
+        wanted = values[0]
+        for attempt in range(1, WRITE_ATTEMPTS + 1):
+            result = self._set(*values)
+            try:
+                got = self.read_now()
+            except Exception:  # noqa: BLE001 - nothing to check against
+                return result
+            if bool(got) == bool(wanted):
+                if attempt > 1:
+                    _LOGGER.warning(
+                        "%s needed %s attempts to accept %s",
+                        self, attempt, wanted,
+                    )
+                return result
+            _LOGGER.debug(
+                "%s: read back %s after writing %s, retrying", self, got, wanted
+            )
+            # Give the firmware a little longer each time round.
+            time.sleep(WRITE_SETTLE * attempt)
+
+        raise SMApiError(
+            f"{self} still reads {got} after {WRITE_ATTEMPTS} attempts to "
+            f"write {wanted}"
+        )

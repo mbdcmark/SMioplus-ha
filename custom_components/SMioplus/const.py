@@ -39,3 +39,8 @@ USE_DIRECT_BUS = True
 # registers are commands the firmware has to act on, and version 1.x left 50ms
 # between every bus operation.  Costs nothing in practice: writes are rare.
 WRITE_SETTLE = 0.01
+
+# How many times to write a verified command before giving up.  The relay
+# set/clear registers are fire and forget: the card acknowledges the I2C
+# transfer, not the switching, so a lost command is silent.
+WRITE_ATTEMPTS = 3

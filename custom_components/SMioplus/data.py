@@ -95,6 +95,10 @@ SM_MAP = {
                     "set": "setRelayCh"
                 },
                 "register": 0,
+                # setRelayCh writes to a set/clear register and the card
+                # acknowledges the transfer, not the switching, so a lost
+                # command is silent.  Read it back.
+                "verify": True,
         }
     },
     # Both analog outputs drive dimmers: the open drain channels are PWM, and

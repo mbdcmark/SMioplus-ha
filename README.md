@@ -272,3 +272,19 @@ time and Home Assistant recorded no brightness of its own.
 `min_value` and `max_value` in `data.py` are the ends of the brightness scale --
 0..10 for the DACs, 0..100 for the open drains. To drive a channel by its raw
 value instead, move its block back under `"number"`.
+
+
+### Verified writes
+
+`setRelayCh` writes to a set/clear register. The card acknowledges the I2C
+transfer, not the switching, so a command it fails to act on is lost in
+silence -- switching eight relays at once left some of them physically on.
+
+An entity marked `"verify": True` in `data.py` is read back after every write
+and retried if the card did not follow, waiting a little longer each time. If it
+still has not followed after `WRITE_ATTEMPTS`, the service call fails with an
+error instead of reporting a state the hardware does not have.
+
+`WRITE_SETTLE` in `const.py` holds the bus for a moment after each write so the
+next transaction cannot arrive before the firmware has acted. Raise it if the
+log starts reporting retries.
