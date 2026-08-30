@@ -173,7 +173,7 @@ Two changes are visible in your entity list.
 
 ### Polling intervals
 
-Most entities are read every 30 seconds. The opto inputs are read every 0.15
+Most entities are read every 30 seconds. The opto inputs are read every 0.1
 seconds, because an input at 30 seconds feels broken -- that default lives with
 the rest of the card description, as `update_interval` on the entity in
 `custom_components/SMioplus/data.py`, and needs no configuration.

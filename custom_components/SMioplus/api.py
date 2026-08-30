@@ -81,6 +81,10 @@ class SMChannel:
         self._set = self._bind_com(
             spec, "set", _SET_VALUE_ARGS.get(platform, _DEFAULT_SET_VALUE_ARGS)
         )
+        # One call that answers for every channel of this type on the card.
+        # The arity check works this out on its own: getOpto(stack) takes no
+        # channel, so it binds without one.
+        self._get_all = self._bind_com(spec, "get_all", 0)
         self._configure(spec)
 
     def __str__(self):
@@ -149,7 +153,20 @@ class SMChannel:
 
     @property
     def readable(self):
-        return self._get is not None
+        return self._get is not None or self._get_all is not None
+
+    @property
+    def bulk(self):
+        """Whether this channel can be served by a whole-port read."""
+        return self._get_all is not None
+
+    def read_bulk(self):
+        """Read the whole port. One result serves every channel of the type."""
+        return self._get_all()
+
+    def decode(self, raw):
+        """Pick this channel out of a whole-port read."""
+        return (int(raw) >> (self.chan - 1)) & 1
 
     @property
     def writable(self):

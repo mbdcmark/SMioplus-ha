@@ -31,13 +31,16 @@ SM_MAP = {
     "binary_sensor": {
         "opto": {
                 "chan_no": 8,
-                # An input is useless at the 30s default.  Eight channels read
-                # one at a time measure ~0.11s, so this is about as fast as it
-                # goes without a bulk read.  Overridable per entity from
+                # An input is useless at the 30s default.  One bulk read now
+                # covers all eight channels, so this is a single transaction
+                # per card per sweep.  Overridable per entity from
                 # configuration.yaml.
-                "update_interval": 0.15,
+                "update_interval": 0.1,
                 "com": {
                     "get": "getOptoCh",
+                    # One transaction for all eight; getOptoCh is this plus
+                    # a bit shift.
+                    "get_all": "getOpto",
                 },
                 "icon": {
                     "on": "mdi:numeric-1",
@@ -81,6 +84,7 @@ SM_MAP = {
                 "chan_no": 8,
                 "com": {
                     "get": "getRelayCh",
+                    "get_all": "getRelays",
                     "set": "setRelayCh"
                 },
         }
