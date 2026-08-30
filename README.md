@@ -360,3 +360,19 @@ CPU core while the log insists it is polling at 0.1s.
 Intervals under a second are therefore driven by a timer of this integration's
 own, started with the first entity that listens. Everything else is left to the
 coordinator, which handles whole seconds correctly.
+
+
+### Which card is in the stack
+
+Each card reports its own revisions in registers 0x78 to 0x7B, and the
+integration reads them once per card at startup:
+
+```
+card 1: hardware 3.0, firmware 1.4
+```
+
+Worth knowing because the vendor's own tool gates its PWM frequency commands
+(`pwmfrd`, `pwmfwr`) on hardware 3.0 or newer: below that, the open drain
+outputs run at a fixed frequency. That is the only version-dependent behaviour
+in the vendor sources, and this integration does not use those commands, so
+older cards lose nothing here.

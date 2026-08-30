@@ -27,7 +27,15 @@ except ImportError:  # the vendor library depends on it, so this is unusual
     smbus2 = None
 
 from .const import COM_NOGET, USE_DIRECT_BUS, WRITE_ATTEMPTS, WRITE_SETTLE
-from .data import API, BASE_ADDRESS, I2C_BUS, SM_MAP, card_from_stack
+from .data import (
+    API,
+    BASE_ADDRESS,
+    FW_REVISION_REGISTER,
+    HW_REVISION_REGISTER,
+    I2C_BUS,
+    SM_MAP,
+    card_from_stack,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -217,6 +225,34 @@ def _fast_port(spec, stack, entity_type, vendor):
         return _PORTS[key]
 
 
+_REVISIONS_READ = set()
+
+
+def _log_revisions(stack):
+    """Say once what the card reports about itself."""
+    if smbus2 is None or stack in _REVISIONS_READ:
+        return
+    # Marked before reading, so a card that will not answer is asked once and
+    # not once per channel.
+    _REVISIONS_READ.add(stack)
+    address = BASE_ADDRESS + stack
+    try:
+        parts = [
+            _BUS.read_stable(stack, address, register + offset)
+            for register in (HW_REVISION_REGISTER, FW_REVISION_REGISTER)
+            for offset in (0, 1)
+        ]
+    except Exception as ex:  # noqa: BLE001 - a card that does not report its
+        # revisions still works; this is only ever information.
+        _LOGGER.debug(
+            "card %s did not report its revisions: %s", card_from_stack(stack), ex
+        )
+        return
+    _LOGGER.info(
+        "card %s: hardware %s.%s, firmware %s.%s", card_from_stack(stack), *parts
+    )
+
+
 def _arity(func):
     """Number of arguments ``func`` takes, or None when it cannot be told."""
     try:
@@ -272,6 +308,7 @@ class SMChannel:
         # Some commands are fire and forget and have to be read back.  Only
         # on/off commands: the check below compares truthiness, not value.
         self._verify = bool(spec.get("verify"))
+        _log_revisions(stack)
         self._configure(spec)
 
     def __str__(self):

@@ -18,6 +18,12 @@ API = libioplus
 # so a mismatch costs speed rather than correctness.
 I2C_BUS = 1
 BASE_ADDRESS = 0x28
+
+# Where the card reports its own revisions, major then minor.  The vendor tool
+# gates its PWM frequency commands on hardware 3.0 or newer, so which card is
+# in the stack is worth knowing.
+HW_REVISION_REGISTER = 0x78
+FW_REVISION_REGISTER = 0x7A
 DOMAIN = "SMioplus"
 NAME_PREFIX = "smio"
 
