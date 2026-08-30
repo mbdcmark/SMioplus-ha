@@ -14,7 +14,7 @@ from inspect import signature
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import BUS_SETTLE
+from .const import BUS_SETTLE, READ_TOLERANCE
 from .data import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,6 +56,7 @@ class SMCoordinator(DataUpdateCoordinator):
         self.interval = interval
         self._channels = {}
         self._slow_warned_at = 0.0
+        self._failures = {}
         self._sweep_lock = asyncio.Lock()
         # When the sweep now being reported started reading the card.  An
         # entity compares this against its own last write to tell a stale
@@ -86,9 +87,23 @@ class SMCoordinator(DataUpdateCoordinator):
             )
             return None
 
+    def _hold(self, key, channel, previous):
+        """Keep the last good value for a few sweeps before giving up on it."""
+        count = self._failures.get(key, 0) + 1
+        self._failures[key] = count
+        if count < READ_TOLERANCE and key in previous:
+            return previous[key]
+        if count == READ_TOLERANCE:
+            _LOGGER.warning(
+                "%s has failed %s reads running; reporting it unavailable",
+                channel, count,
+            )
+        return None
+
     def _read_all(self):
         """Read every channel. Runs in an executor; each call locks the bus."""
         started = self.sweep_started = time.monotonic()
+        previous = self.data or {}
         values = {}
 
         # getOptoCh() is getOpto() plus a bit shift, and getRelayCh() is
@@ -103,25 +118,36 @@ class SMCoordinator(DataUpdateCoordinator):
         # "dictionary changed size during iteration" right after a restart.
         # Anything added mid-sweep is picked up by the next one.
         for key, channel in list(self._channels.items()):
+            failed = False
+            value = None
             try:
                 if channel.bulk:
-                    port = (channel.stack, channel.entity_type)
+                    port = channel.entity_type
                     if port not in ports:
                         if transactions and BUS_SETTLE:
                             time.sleep(BUS_SETTLE)
-                        ports[port] = self._read_bulk(channel)
                         transactions += 1
+                        ports[port] = self._read_bulk(channel)
                     raw = ports[port]
-                    values[key] = None if raw is None else channel.decode(raw)
+                    if raw is None:
+                        failed = True
+                    else:
+                        value = channel.decode(raw)
                 else:
                     if transactions and BUS_SETTLE:
                         time.sleep(BUS_SETTLE)
-                    values[key] = channel.get()
                     transactions += 1
+                    value = channel.get()
             except Exception as ex:  # noqa: BLE001 - one bad channel must not
                 # take the rest of the card down with it.
                 _LOGGER.error("Reading %s failed: %s", channel, ex)
-                values[key] = None
+                failed = True
+
+            if failed:
+                values[key] = self._hold(key, channel, previous)
+            else:
+                self._failures.pop(key, None)
+                values[key] = value
 
         if values and all(value is None for value in values.values()):
             raise UpdateFailed(f"Card on stack {self.stack} did not answer")

@@ -52,3 +52,9 @@ WRITE_ATTEMPTS = 3
 # single write and they switch together.  Long enough to catch the batch,
 # short enough not to be felt on a single switch.
 BATCH_WINDOW = 0.05
+
+# How many sweeps in a row a channel may fail before it is reported
+# unavailable.  A single failed read is usually the bus being busy, not the
+# card being gone, and flicking every entity to unavailable over it is worse
+# than holding the last value for another sweep or two.
+READ_TOLERANCE = 3

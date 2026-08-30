@@ -307,3 +307,17 @@ eight transactions rather than sixty-four.
 A single switch waits the same window before anything happens, which is 50ms
 and not worth noticing. Types without a `set_all` -- the dimmers -- are written
 one at a time as before.
+
+
+### A failed read is not the same as a missing card
+
+`getOpto` reads the port until two reads agree and gives up after ten tries, so
+a busy bus or an input changing under it can fail a read that would have
+succeeded a moment later. Flicking every channel on the card to unavailable
+over that is worse than waiting: an automation watching a binary sensor sees a
+jump to `unavailable` and back.
+
+A channel that fails a read keeps its last value for `READ_TOLERANCE` sweeps
+before it is reported unavailable, and the log says so when it gets there. On
+the 0.1s opto poller that is three tenths of a second of holding still; on the
+30s poller it is a minute and a half, which is the cost of not crying wolf.
