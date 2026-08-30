@@ -399,8 +399,12 @@ every channel of every type still comes up. A type left out keeps the default
 from the card description, and a per-entity `update_interval` still wins over
 both.
 
-`examples/sequent.yaml` has the whole thing for eight cards, with a YAML anchor
-so the intervals are written once. Point `configuration.yaml` at it with:
+A card needs nothing but its number, so name an interval only where it should
+differ. `examples/sequent.yaml` shows both that and the fuller form. If you do
+reach for a YAML anchor to save repetition, give each one its own name: an
+alias takes the most recent anchor of that name above it, so reusing a name
+quietly hands later cards the wrong block. Point `configuration.yaml` at the
+file with:
 
 ```yaml
 SMioplus: !include sequent.yaml
