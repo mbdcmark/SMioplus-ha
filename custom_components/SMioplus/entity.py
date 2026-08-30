@@ -59,8 +59,13 @@ async def async_setup_sm_platform(
         add_entities([factory(channel, name)])
         return
 
+    # configuration.yaml wins; then whatever the card description asks for
+    # this entity type; then the integration default.
+    spec = SM_MAP[platform][entity_type]
     interval = float(
-        discovery_info.get(CONF_UPDATE_INTERVAL) or DEFAULT_UPDATE_INTERVAL
+        discovery_info.get(CONF_UPDATE_INTERVAL)
+        or spec.get(CONF_UPDATE_INTERVAL)
+        or DEFAULT_UPDATE_INTERVAL
     )
     coordinator = async_get_coordinator(hass, stack, interval)
     coordinator.register(channel)

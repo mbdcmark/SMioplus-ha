@@ -31,6 +31,10 @@ SM_MAP = {
     "binary_sensor": {
         "opto": {
                 "chan_no": 8,
+                # An input is useless at the 30s default; ten reads a second
+                # keeps a hand-thrown switch feeling immediate.  Overridable
+                # per entity from configuration.yaml.
+                "update_interval": 0.1,
                 "com": {
                     "get": "getOptoCh",
                 },

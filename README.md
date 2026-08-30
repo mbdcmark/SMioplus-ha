@@ -171,27 +171,31 @@ Two changes are visible in your entity list.
    services, Entities.
 
 
-### Polling faster than the default
+### Polling intervals
 
-Inputs are read every 30 seconds unless you say otherwise, which is too slow to
-test an opto input by hand. Give that entity its own interval:
+Most entities are read every 30 seconds. The opto inputs are read every 0.1
+seconds, because an input at 30 seconds feels broken -- that default lives with
+the rest of the card description, as `update_interval` on the entity in
+`custom_components/SMioplus/data.py`, and needs no configuration.
+
+To choose an interval yourself, name the entity and say so:
 
 ```yaml
 SMioplus:
     - stack: 0
-      opto:
-        update_interval: 0.1
-      relay:
       adc:
+        update_interval: 5
+      opto:
       opto_cnt:
       opto_cnt_rst:
+      relay:
       dac:
       od:
 ```
 
 Naming any entity means only the named entities are loaded, which is why the
-rest are listed too -- each on its own line, with no options, so they keep the
-30 second default.
+rest are listed too -- each on its own line, with no options, so they keep
+whatever default they already had.
 
 Each distinct interval gets its own poller, so the eight opto channels are read
 in a sweep of their own rather than dragging the other forty along.
