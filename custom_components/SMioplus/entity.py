@@ -20,7 +20,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
 )
 from .coordinator import async_get_coordinator
-from .data import DOMAIN, NAME_PREFIX, NAME_STACK_OFFSET, SM_MAP
+from .data import DOMAIN, NAME_PREFIX, SM_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,8 +89,7 @@ class SMEntityMixin:
             f"{DOMAIN}_{channel.stack}_{channel.entity_type}_{channel.chan}"
         )
         self._attr_name = name or (
-            f"{NAME_PREFIX}{channel.stack + NAME_STACK_OFFSET}"
-            f"_{channel.entity_type}_{channel.chan}"
+            f"{NAME_PREFIX}{channel.stack}_{channel.entity_type}_{channel.chan}"
         )
         # No device_info on purpose.  Home Assistant only lets an entity join
         # the device registry through a config entry, and this integration is
