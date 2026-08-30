@@ -5,6 +5,7 @@ that used to live in button.py, sensor.py, switch.py and number.py.
 """
 
 import logging
+import time
 
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -108,6 +109,10 @@ class SMEntityMixin:
 class SMPolledEntity(SMEntityMixin, CoordinatorEntity):
     """An entity whose value comes from the card's coordinator sweep."""
 
+    # Set when this entity last drove the card, so a sweep that read the card
+    # before that can be told apart from one that read it after.
+    _sm_written_at = 0.0
+
     def __init__(self, channel, name, coordinator, default_icons):
         CoordinatorEntity.__init__(self, coordinator, context=channel.key)
         self._sm_setup(channel, name, default_icons)
@@ -123,6 +128,11 @@ class SMPolledEntity(SMEntityMixin, CoordinatorEntity):
         self._sm_apply_icon(value)
 
     def _handle_coordinator_update(self):
+        if self.coordinator.sweep_started < self._sm_written_at:
+            # This sweep read the card before our write reached it, so its
+            # answer is stale.  Switching eight relays at once used to land
+            # some of them back on for a whole interval this way.
+            return
         # data is still None when the very first sweep failed.
         data = self.coordinator.data or {}
         self._sm_ingest(data.get(self._sm_channel.key))
@@ -147,5 +157,7 @@ class SMWritableEntity(SMPolledEntity):
             # OSError/IOError on bus trouble.
             _LOGGER.error("Writing %s failed: %s", self._sm_channel, ex)
             raise HomeAssistantError(f"Writing {self._sm_channel} failed: {ex}") from ex
-        # Show the truth from the card as soon as the debouncer allows.
+        # Any sweep already under way read the card before this, so mark the
+        # moment before asking for a fresh one.
+        self._sm_written_at = time.monotonic()
         await self.coordinator.async_request_refresh()

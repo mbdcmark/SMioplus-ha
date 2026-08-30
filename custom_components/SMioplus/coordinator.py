@@ -51,6 +51,10 @@ class SMCoordinator(DataUpdateCoordinator):
         self.interval = interval
         self._channels = {}
         self._slow_warned = False
+        # When the sweep now being reported started reading the card.  An
+        # entity compares this against its own last write to tell a stale
+        # answer from a current one.
+        self.sweep_started = 0.0
 
     def register(self, channel):
         """Include ``channel`` in every sweep from now on."""
@@ -74,7 +78,7 @@ class SMCoordinator(DataUpdateCoordinator):
 
     def _read_all(self):
         """Read every channel. Runs in an executor; each call locks the bus."""
-        started = time.monotonic()
+        started = self.sweep_started = time.monotonic()
         values = {}
 
         # getOptoCh() is getOpto() plus a bit shift, and getRelayCh() is
