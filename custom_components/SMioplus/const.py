@@ -34,10 +34,11 @@ BUS_SETTLE = 0.0
 # direct register path in api.py.
 USE_DIRECT_BUS = True
 
-# Seconds to hold the bus after writing to the card, so two writes cannot
-# arrive back to back.  Reads are safe without it, but the relay set/clear
-# registers are commands the firmware has to act on, and version 1.x left 50ms
-# between every bus operation.  Costs nothing in practice: writes are rare.
+# Seconds to keep the next transaction off a card after writing to it, so the
+# firmware has acted before anything else reaches it.  Reads are safe without
+# it, but the relay set/clear registers are commands the card has to carry out.
+# It is a per card wait, not a bus wide one: the other cards are separate
+# devices and are read straight through it.
 WRITE_SETTLE = 0.01
 
 # How many times to write a verified command before giving up.  The relay

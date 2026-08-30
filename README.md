@@ -285,6 +285,8 @@ and retried if the card did not follow, waiting a little longer each time. If it
 still has not followed after `WRITE_ATTEMPTS`, the service call fails with an
 error instead of reporting a state the hardware does not have.
 
-`WRITE_SETTLE` in `const.py` holds the bus for a moment after each write so the
-next transaction cannot arrive before the firmware has acted. Raise it if the
-log starts reporting retries.
+`WRITE_SETTLE` in `const.py` keeps the next transaction off that card for a
+moment after each write, so the firmware has acted before anything else reaches
+it. It is per card, not bus wide: writing to one card does not hold up reading
+the others, which matters when eight of them are being polled ten times a
+second. Raise it if the log starts reporting retries.

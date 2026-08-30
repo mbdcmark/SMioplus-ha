@@ -14,6 +14,7 @@ setup and raises :class:`SMApiError` when the library does not match what the
 card description asks for -- rather than silently picking the wrong form.
 """
 
+import contextlib
 import inspect
 import logging
 import threading
@@ -39,6 +40,41 @@ BUS_LOCK = threading.RLock()
 # carries out an action; everything else writes a value.
 _SET_VALUE_ARGS = {"button": 0}
 _DEFAULT_SET_VALUE_ARGS = 1
+
+# When each card is ready for its next transaction.  A write needs the card to
+# have acted before the next one reaches it, but that is the firmware of one
+# card: the other seven are separate devices and can be read meanwhile.  So the
+# wait is recorded per stack and served without holding the bus.
+_BUSY_UNTIL: dict[int, float] = {}
+_BUSY_LOCK = threading.Lock()
+
+
+@contextlib.contextmanager
+def bus_for(stack):
+    """Hold the bus, but only once this card is ready for it.
+
+    The lock is never held while waiting, so a card serving out its settle
+    does not stop the others from being read.
+    """
+    while True:
+        BUS_LOCK.acquire()
+        with _BUSY_LOCK:
+            delay = _BUSY_UNTIL.get(stack, 0.0) - time.monotonic()
+        if delay <= 0:
+            break
+        BUS_LOCK.release()
+        time.sleep(delay)
+    try:
+        yield
+    finally:
+        BUS_LOCK.release()
+
+
+def _mark_busy(stack, seconds):
+    """Keep the next transaction off this card for a moment."""
+    with _BUSY_LOCK:
+        _BUSY_UNTIL[stack] = time.monotonic() + seconds
+
 
 # One API object per stack level, instead of one per entity.
 _TARGETS: dict[int, object] = {}
@@ -69,13 +105,13 @@ class _Bus:
             except OSError:
                 pass
 
-    def read_stable(self, address, register, retries=10):
+    def read_stable(self, stack, address, register, retries=10):
         """Read until two reads agree, as the vendor library does.
 
         The card can answer while it is updating the register, so a single
         read is not trustworthy.
         """
-        with BUS_LOCK:
+        with bus_for(stack):
             try:
                 if self._handle is None:
                     self._handle = smbus2.SMBus(I2C_BUS)
@@ -111,6 +147,7 @@ class _FastPort:
     _MAX_FAILURES = 3
 
     def __init__(self, stack, register, vendor, label):
+        self._stack = stack
         self._address = BASE_ADDRESS + stack
         self._register = register
         self._vendor = vendor
@@ -125,7 +162,7 @@ class _FastPort:
         if not self._enabled:
             return self._vendor()
         try:
-            value = _BUS.read_stable(self._address, self._register)
+            value = _BUS.read_stable(self._stack, self._address, self._register)
         except Exception as ex:  # noqa: BLE001 - any bus trouble at all
             self._failures += 1
             if self._failures < self._MAX_FAILURES:
@@ -295,12 +332,12 @@ class SMChannel:
         chan_arg = (self.chan,) if uses_chan else ()
 
         def call(*values):
-            with BUS_LOCK:
+            with bus_for(self.stack):
                 result = func(*prefix, *chan_arg, *values)
                 if settle:
-                    # Held inside the lock: the point is to keep the next
-                    # transaction off the bus, not just this thread.
-                    time.sleep(settle)
+                    # A deadline rather than a sleep: the bus is free at once,
+                    # and only the next transaction to this card waits.
+                    _mark_busy(self.stack, settle)
                 return result
 
         return call
