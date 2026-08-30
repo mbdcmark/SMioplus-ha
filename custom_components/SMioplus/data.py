@@ -44,6 +44,7 @@ SM_MAP = {
         "opto_cnt": {
                 "chan_no": 8,
                 "uom": "",
+                "precision": 0,
                 # Counting up until the matching reset button clears it.
                 "state_class": "total_increasing",
                 "com": {
@@ -55,6 +56,8 @@ SM_MAP = {
                 "uom": "V",
                 "device_class": "voltage",
                 "state_class": "measurement",
+                # 12-bit over 0..10V, so millivolts are meaningful.
+                "precision": 3,
                 "com": {
                     "get": "getAdcV",
                 },

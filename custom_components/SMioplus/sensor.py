@@ -28,6 +28,7 @@ class Sensor(SMPolledEntity, SensorEntity):
         self._attr_native_unit_of_measurement = spec.get("uom") or None
         self._attr_device_class = spec.get("device_class")
         self._attr_state_class = spec.get("state_class")
+        self._attr_suggested_display_precision = spec.get("precision")
         ### __CUSTOM_SETUP__ START
         ### __CUSTOM_SETUP__ END
 
