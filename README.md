@@ -175,10 +175,19 @@ Two changes are visible in your entity list.
 
 ### Polling intervals
 
-Most entities are read every 30 seconds. The opto inputs are read every 0.1
-seconds, because an input at 30 seconds feels broken -- that default lives with
-the rest of the card description, as `update_interval` on the entity in
-`custom_components/SMioplus/data.py`, and needs no configuration.
+How often each entity type is read is part of the card description: every one
+of them carries an `update_interval` in `custom_components/SMioplus/data.py`,
+which is the one place to change it and needs no configuration.
+
+| entity | read every |
+| --- | --- |
+| `opto` | 0.1s |
+| `opto_cnt`, `adc`, `relay`, `dac`, `od` | 60s |
+| `opto_cnt_rst` | never -- a button has nothing to read |
+
+An input at 60 seconds feels broken, which is why the opto inputs are the
+exception. The rest either change slowly or are written by Home Assistant
+itself, which shows the new value immediately and only polls to confirm it.
 
 To choose an interval yourself, name the entity and say so:
 
@@ -317,7 +326,8 @@ succeeded a moment later. Flicking every channel on the card to unavailable
 over that is worse than waiting: an automation watching a binary sensor sees a
 jump to `unavailable` and back.
 
-A channel that fails a read keeps its last value for `READ_TOLERANCE` sweeps
-before it is reported unavailable, and the log says so when it gets there. On
-the 0.1s opto poller that is three tenths of a second of holding still; on the
-30s poller it is a minute and a half, which is the cost of not crying wolf.
+A channel that fails a read keeps its last value for `READ_TOLERANCE` sweeps or
+`READ_HOLD_SECONDS`, whichever ends first, and the log says so when it gives
+up. On the 0.1s opto poller that is three tenths of a second of holding still;
+on the 60s poller the time cap ends it, because three sweeps there would be
+three minutes of reporting a reading nobody took.

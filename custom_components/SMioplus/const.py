@@ -17,7 +17,7 @@ CONF_UPDATE_INTERVAL = "update_interval"  # In seconds
 # is reported instead.
 COM_NOGET = "__NOGET__"
 
-DEFAULT_UPDATE_INTERVAL = 30.0
+DEFAULT_UPDATE_INTERVAL = 60.0
 
 # Polling faster than this hammers the I2C bus without giving anything back.
 MIN_UPDATE_INTERVAL = 0.05
@@ -58,3 +58,7 @@ BATCH_WINDOW = 0.05
 # card being gone, and flicking every entity to unavailable over it is worse
 # than holding the last value for another sweep or two.
 READ_TOLERANCE = 3
+
+# ...and never hold a stale value longer than this, however slow the poller.
+# Three sweeps of a minute is three minutes of reporting a reading nobody took.
+READ_HOLD_SECONDS = 30.0

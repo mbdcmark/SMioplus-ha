@@ -14,7 +14,7 @@ from inspect import signature
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import BUS_SETTLE, READ_TOLERANCE
+from .const import BUS_SETTLE, READ_HOLD_SECONDS, READ_TOLERANCE
 from .data import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,16 +87,26 @@ class SMCoordinator(DataUpdateCoordinator):
             )
             return None
 
-    def _hold(self, key, channel, previous):
-        """Keep the last good value for a few sweeps before giving up on it."""
-        count = self._failures.get(key, 0) + 1
-        self._failures[key] = count
-        if count < READ_TOLERANCE and key in previous:
+    def _hold(self, key, channel, previous, now):
+        """Keep the last good value for a while before giving up on it."""
+        state = self._failures.get(key)
+        if state is None:
+            state = self._failures[key] = {"count": 0, "since": now, "told": False}
+        state["count"] += 1
+        waited = now - state["since"]
+
+        if (
+            state["count"] < READ_TOLERANCE
+            and waited < READ_HOLD_SECONDS
+            and key in previous
+        ):
             return previous[key]
-        if count == READ_TOLERANCE:
+
+        if not state["told"]:
+            state["told"] = True
             _LOGGER.warning(
-                "%s has failed %s reads running; reporting it unavailable",
-                channel, count,
+                "%s has failed %s read(s) over %.0fs; reporting it unavailable",
+                channel, state["count"], waited,
             )
         return None
 
@@ -144,7 +154,7 @@ class SMCoordinator(DataUpdateCoordinator):
                 failed = True
 
             if failed:
-                values[key] = self._hold(key, channel, previous)
+                values[key] = self._hold(key, channel, previous, started)
             else:
                 self._failures.pop(key, None)
                 values[key] = value

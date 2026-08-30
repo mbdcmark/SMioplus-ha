@@ -37,10 +37,9 @@ SM_MAP = {
     "binary_sensor": {
         "opto": {
                 "chan_no": 8,
-                # An input is useless at the 30s default.  One bulk read now
+                # An input is useless at the slow default.  One bulk read
                 # covers all eight channels, so this is a single transaction
-                # per card per sweep.  Overridable per entity from
-                # configuration.yaml.
+                # per card per sweep.
                 "update_interval": 0.1,
                 "com": {
                     "get": "getOptoCh",
@@ -58,6 +57,7 @@ SM_MAP = {
     "sensor":  {
         "opto_cnt": {
                 "chan_no": 8,
+                "update_interval": 60,
                 "uom": "",
                 "precision": 0,
                 # Counting up until the matching reset button clears it.
@@ -72,6 +72,7 @@ SM_MAP = {
         },
         "adc": {
                 "chan_no": 8,
+                "update_interval": 60,
                 "uom": "V",
                 "device_class": "voltage",
                 "state_class": "measurement",
@@ -89,6 +90,7 @@ SM_MAP = {
     "switch": {
         "relay": {
                 "chan_no": 8,
+                "update_interval": 60,
                 "com": {
                     "get": "getRelayCh",
                     "get_all": "getRelays",
@@ -110,6 +112,7 @@ SM_MAP = {
     "light": {
         "dac": {
                 "chan_no": 4,
+                "update_interval": 60,
                 "min_value": 0.0,
                 "max_value": 10.0,
                 "com": {
@@ -119,6 +122,7 @@ SM_MAP = {
         },
         "od": {
                 "chan_no": 4,
+                "update_interval": 60,
                 "min_value": 0.0,
                 "max_value": 100.0,
                 "com": {
