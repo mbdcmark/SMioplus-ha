@@ -22,8 +22,10 @@ DEFAULT_UPDATE_INTERVAL = 30.0
 # Polling faster than this hammers the I2C bus without giving anything back.
 MIN_UPDATE_INTERVAL = 0.05
 
-# The cards need a moment between two transactions.  This used to be a
-# ``time.sleep`` at the top of every entity's update(); it now paces the single
-# sweep the coordinator does, so the cost is paid once per cycle instead of
-# once per entity.
-BUS_SETTLE = 0.05
+# Seconds to wait between two bus transactions.  Version 1.x slept 50ms at the
+# top of every entity's update(), because forty entities polled the card from
+# their own threads and the transactions interleaved.  The bus lock in api.py
+# now serialises them properly, so the wait buys nothing and would put a floor
+# of ~0.35s under an eight channel sweep.  Raise it only if reads start failing
+# on a long or noisy bus.
+BUS_SETTLE = 0.0

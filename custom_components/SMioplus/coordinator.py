@@ -42,10 +42,15 @@ class SMCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=f"{DOMAIN} stack {stack} every {interval}s",
             update_interval=timedelta(seconds=interval),
+            # Ten sweeps a second mostly read back what the last one did.
+            # Waking every entity for an unchanged value is pure cost.
+            always_update=False,
             **kwargs,
         )
         self.stack = stack
+        self.interval = interval
         self._channels = {}
+        self._slow_warned = False
 
     def register(self, channel):
         """Include ``channel`` in every sweep from now on."""
@@ -57,9 +62,10 @@ class SMCoordinator(DataUpdateCoordinator):
 
     def _read_all(self):
         """Read every channel. Runs in an executor; each call locks the bus."""
+        started = time.monotonic()
         values = {}
         for index, (key, channel) in enumerate(self._channels.items()):
-            if index:
+            if index and BUS_SETTLE:
                 time.sleep(BUS_SETTLE)
             try:
                 values[key] = channel.get()
@@ -71,4 +77,14 @@ class SMCoordinator(DataUpdateCoordinator):
         if self._channels and all(value is None for value in values.values()):
             raise UpdateFailed(f"Card on stack {self.stack} did not answer")
 
+        elapsed = time.monotonic() - started
+        if elapsed > self.interval and not self._slow_warned:
+            # Once is enough; at a tenth of a second this would flood the log.
+            self._slow_warned = True
+            _LOGGER.warning(
+                "Reading %s channel(s) on stack %s took %.3fs, longer than the "
+                "%.3fs interval asked for. Raise update_interval or poll fewer "
+                "channels.",
+                len(self._channels), self.stack, elapsed, self.interval,
+            )
         return values

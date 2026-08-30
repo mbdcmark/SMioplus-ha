@@ -115,7 +115,7 @@ SMioplus:
         chan_range: "1..8"
       opto_cnt:
         chan_range: "2..6"
-        update_interval: 1
+        update_interval: 0.1
 ```
 
 [//]: # (__CUSTOM_README__ START)
@@ -180,7 +180,7 @@ test an opto input by hand. Give that entity its own interval:
 SMioplus:
     - stack: 0
       opto:
-        update_interval: 1
+        update_interval: 0.1
       relay:
       adc:
       opto_cnt:
@@ -194,6 +194,10 @@ rest are listed too -- each on its own line, with no options, so they keep the
 30 second default.
 
 Each distinct interval gets its own poller, so the eight opto channels are read
-in a sweep of their own rather than dragging the other forty along at 1 second.
-Do not set an interval shorter than the sweep it drives: the card needs about
-50ms between transactions, so eight channels need roughly half a second.
+in a sweep of their own rather than dragging the other forty along.
+
+The bus lock serialises transactions, so there is no artificial wait between
+them and eight channels read in a few milliseconds; 0.1 second intervals are
+workable. If a sweep does overrun its interval the log says so once, naming the
+measured time. Should reads start failing on a long or noisy bus, raise
+`BUS_SETTLE` in `custom_components/SMioplus/const.py`.
