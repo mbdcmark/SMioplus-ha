@@ -17,6 +17,7 @@ card description asks for -- rather than silently picking the wrong form.
 import inspect
 import logging
 import threading
+import time
 from inspect import signature
 
 try:
@@ -24,7 +25,7 @@ try:
 except ImportError:  # the vendor library depends on it, so this is unusual
     smbus2 = None
 
-from .const import COM_NOGET, USE_DIRECT_BUS
+from .const import COM_NOGET, USE_DIRECT_BUS, WRITE_SETTLE
 from .data import API, BASE_ADDRESS, I2C_BUS, SM_MAP
 
 _LOGGER = logging.getLogger(__name__)
@@ -202,7 +203,8 @@ class SMChannel:
         self.key = (stack, entity_type, chan)
         self._get = self._bind_com(spec, "get", 0)
         self._set = self._bind_com(
-            spec, "set", _SET_VALUE_ARGS.get(platform, _DEFAULT_SET_VALUE_ARGS)
+            spec, "set", _SET_VALUE_ARGS.get(platform, _DEFAULT_SET_VALUE_ARGS),
+            settle=WRITE_SETTLE,
         )
         # One call that answers for every channel of this type on the card.
         # The arity check works this out on its own: getOpto(stack) takes no
@@ -230,15 +232,15 @@ class SMChannel:
             args = tuple(value) if isinstance(value, (list, tuple)) else (value,)
             self._bind(name, len(args))(*args)
 
-    def _bind_com(self, spec, action, value_args):
+    def _bind_com(self, spec, action, value_args, settle=0.0):
         name = spec["com"].get(action)
         if not name or name == COM_NOGET:
             # The card cannot do this; the entity falls back to reporting the
             # last value it wrote.
             return None
-        return self._bind(name, value_args)
+        return self._bind(name, value_args, settle)
 
-    def _bind(self, name, value_args):
+    def _bind(self, name, value_args, settle=0.0):
         """Resolve a vendor function into a call for this channel."""
         target = _target(self.stack)
         try:
@@ -277,7 +279,12 @@ class SMChannel:
 
         def call(*values):
             with BUS_LOCK:
-                return func(*prefix, *chan_arg, *values)
+                result = func(*prefix, *chan_arg, *values)
+                if settle:
+                    # Held inside the lock: the point is to keep the next
+                    # transaction off the bus, not just this thread.
+                    time.sleep(settle)
+                return result
 
         return call
 

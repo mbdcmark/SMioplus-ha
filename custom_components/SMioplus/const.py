@@ -33,3 +33,9 @@ BUS_SETTLE = 0.0
 # Set False to make every read go through the vendor library, ignoring the
 # direct register path in api.py.
 USE_DIRECT_BUS = True
+
+# Seconds to hold the bus after writing to the card, so two writes cannot
+# arrive back to back.  Reads are safe without it, but the relay set/clear
+# registers are commands the firmware has to act on, and version 1.x left 50ms
+# between every bus operation.  Costs nothing in practice: writes are rare.
+WRITE_SETTLE = 0.01
