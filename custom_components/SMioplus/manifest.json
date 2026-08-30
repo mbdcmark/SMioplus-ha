@@ -1,0 +1,14 @@
+{
+	"domain": "SMioplus",
+	"name": "Sequent Microsystems Home Automation Integration",
+	"version": "2.0.0",
+	"integration_type": "device",
+	"iot_class": "local_polling",
+	"documentation": "https://github.com/mbdcmark/SMioplus-ha",
+	"issue_tracker": "https://github.com/mbdcmark/SMioplus-ha/issues",
+	"dependencies": [],
+	"after_dependencies": [],
+	"codeowners": ["@3lv", "@mbdcmark"],
+	"config_flow": false,
+	"requirements": ["SMioplus>=1.0.0"]
+}

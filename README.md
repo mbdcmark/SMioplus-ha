@@ -1,0 +1,168 @@
+# Sequent Microsystems Home Automation Home Assistant Integration
+
+Integrate [Home Automation](https://sequentmicrosystems.com/products/raspberry-pi-home-automation-card)
+seamlessly with Home Assistant, bringing all your custom functionality into the Home Assistant ecosystem for enhanced control, automation, and ease of use.
+
+
+
+## Installation
+
+> If you already have HACS, I2C and File editor configured, you can skip to [The actual installation](#the-actual-installation)
+
+
+#### Video tutorials
+
+- [Install HACS video](https://youtu.be/Fl3lATWhQVM) for step 1.
+- [Enable I2C and Install file editor video](https://youtu.be/53Zj8NofS7k) for steps 2. and 3.
+- [Install and config card drivers video](https://youtu.be/yH2HKjm7j24) for steps 4. and 5.
+
+#### Prerequirements
+
+1. Install HACS
+    - Follow the official [instructions](https://www.hacs.xyz/docs/use/download/download/)
+
+2. Install and run HassOS I2C Configurator add-on
+    - Install [HassOS I2C Configurator](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fadamoutler%2FHassOSConfigurator)
+    - Select your profile from the buttom left corner and enable `Advanced mode` in User settings
+    - In Settings, Add-ons, Add-on Store, search and install `HassOS I2C Configurator`
+    - Disable `Protection mode`
+    - Start the add-on
+
+3. Install File editor add-on
+    - In Settings, Add-ons, Add-on Store, search and install `File editor`
+    - Enable `Show in sidebar`
+(see multiple config options bellow)
+
+
+### The actual installation
+
+4. Install SMioplus-ha from HACS
+    - Open HACS (from the sidebar)
+    - Click on the 3 dots in the top right corner and select `Custom repositories`
+    - Repository is `SequentMicrosystems/SMioplus-ha` and type is `Integration`
+    - Once added, you can now search it in HACS menu and download it
+
+5. Add SMioplus config in configuration.yaml
+    - In the sidebar, select `File editor` and start the add-on
+    - Click the folder icon from the top left corner and edit `configuration.yaml`
+    - At the end of the file append the SMioplus config:
+        ```yaml
+        SMioplus:
+        ```
+        > for more information, see [configuration.yaml](#configuration.yaml)
+    - Save the file
+
+6. Reboot system
+
+7. Reboot system (yes, it must be done twice)
+
+
+
+## configuration.yaml
+
+`configuration.yaml` example:
+```yaml
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+SMioplus:
+    # + optional configs
+```
+
+- Simple stack 0 config:
+
+```yaml
+SMioplus:
+```
+
+- Specific stack config:
+
+```yaml
+SMioplus:
+    - stack: 2
+```
+
+- Multiple cards on different stack levels:
+
+```yaml
+SMioplus:
+    - stack: 0
+    - stack: 2
+    - stack: 3
+```
+
+- Only specific entities for different stack levels:
+
+> !The following example is provided for illustrative purposes only and does NOT necessarily represent real entities!
+
+```yaml
+SMioplus:
+    - stack: 0
+      relay_1:
+      relay_3:
+      opto_1:
+        update_interval: 0.1
+    - stack: 2
+      relay:
+        chan_range: "1..8"
+      opto_cnt:
+        chan_range: "2..6"
+        update_interval: 1
+```
+
+[//]: # (__CUSTOM_README__ START)
+[//]: # (__CUSTOM_README__ END)
+
+### `configuration.yaml` entities
+
+Possible entities:
+```yaml
+opto_cnt_rst_1: -> opto_cnt_rst_8:  (type: button)
+dac_1: -> dac_4:  (type: number)
+od_1: -> od_4:  (type: number)
+adc_1: -> adc_8:  (type: sensor)
+opto_cnt_1: -> opto_cnt_8:  (type: sensor)
+opto_1: -> opto_8:  (type: binary_sensor)
+relay_1: -> relay_8:  (type: switch)
+```
+
+Entity options:
+- `chan_range: "start..end"` (inclusive channel range, e.g. `"2..6"`)
+- `channels: "a,b,c"` (an explicit list of channels, e.g. `"1,3,5"`)
+- `update_interval: seconds` (how often the card is read, default 30s; applies
+  to every entity that has a value to read, so all of them except the buttons)
+
+`chan_range` and `channels` are alternatives; when both are given, `channels`
+wins. Channels the card does not have are reported in the log and skipped, as
+are unknown entity names and stack levels outside 0..7.
+
+All entities of one stack level are grouped under a single device, so you can
+find them together under Settings, Devices & services.
+
+Each card is read in a single pass per interval rather than once per entity, so
+a card with 48 entities issues one sweep of I2C transactions every 30 seconds
+instead of 48 independent ones.
+
+
+## Upgrading from 1.x
+
+Two changes are visible in your entity list.
+
+1. `opto_1` .. `opto_8` are on/off inputs and have become `binary_sensor`s
+   instead of `sensor`s, so `sensor.smio0_opto_1` is now
+   `binary_sensor.smio0_opto_1`. Automations and dashboards naming those
+   entities need updating. To keep the old behaviour, move the `opto` block in
+   `custom_components/SMioplus/data.py` back under `"sensor"`.
+2. Entities now have a stable, deterministic unique id. Version 1.x derived it
+   from the entity id at startup, which could change on a reload and register
+   the same channel a second time. The old registry entries are orphaned by the
+   upgrade; remove any leftover duplicates once under Settings, Devices &
+   services, Entities.
