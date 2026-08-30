@@ -6,6 +6,7 @@ walks the registered channels once per interval and hands the result to every
 entity that asked for it.
 """
 
+import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -17,6 +18,10 @@ from .const import BUS_SETTLE
 from .data import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# How often at most to complain that a sweep overran its interval.  Once ever
+# is too quiet: adding cards later changes the arithmetic.
+SLOW_WARN_EVERY = 300.0
 
 
 def async_get_coordinator(hass, stack, interval):
@@ -50,7 +55,8 @@ class SMCoordinator(DataUpdateCoordinator):
         self.stack = stack
         self.interval = interval
         self._channels = {}
-        self._slow_warned = False
+        self._slow_warned_at = 0.0
+        self._sweep_lock = asyncio.Lock()
         # When the sweep now being reported started reading the card.  An
         # entity compares this against its own last write to tell a stale
         # answer from a current one.
@@ -62,7 +68,11 @@ class SMCoordinator(DataUpdateCoordinator):
             self._channels[channel.key] = channel
 
     async def _async_update_data(self):
-        return await self.hass.async_add_executor_job(self._read_all)
+        # One sweep at a time.  sweep_started has to describe the data being
+        # handed to the entities: if two sweeps overlapped, a stale answer
+        # could pass the check that keeps a write from being undone.
+        async with self._sweep_lock:
+            return await self.hass.async_add_executor_job(self._read_all)
 
     def _read_bulk(self, channel):
         """One whole-port read, or None if it failed."""
@@ -117,9 +127,9 @@ class SMCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Card on stack {self.stack} did not answer")
 
         elapsed = time.monotonic() - started
-        if elapsed > self.interval and not self._slow_warned:
-            # Once is enough; at a tenth of a second this would flood the log.
-            self._slow_warned = True
+        if elapsed > self.interval and started - self._slow_warned_at > SLOW_WARN_EVERY:
+            # Rate limited: at a tenth of a second this would flood the log.
+            self._slow_warned_at = started
             _LOGGER.warning(
                 "Reading %s channel(s) on stack %s took %.3fs in %s bus "
                 "transaction(s), longer than the %.3fs interval asked for. "

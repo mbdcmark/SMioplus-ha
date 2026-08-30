@@ -1,7 +1,7 @@
 """Shared behaviour for every SMioplus entity.
 
-This replaces the four near-identical copies of the setup and API binding code
-that used to live in button.py, sensor.py, switch.py and number.py.
+This replaces the near-identical copies of the setup and API binding code that
+used to live in each platform module.
 """
 
 import logging
@@ -73,7 +73,7 @@ async def async_setup_sm_platform(
 
 
 class SMEntityMixin:
-    """Identity, naming and device grouping, shared by all platforms."""
+    """Identity and naming, shared by all platforms."""
 
     _attr_has_entity_name = False
 

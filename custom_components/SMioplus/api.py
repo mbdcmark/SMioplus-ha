@@ -106,12 +106,17 @@ class _FastPort:
     itself rather than reporting fiction.
     """
 
+    # A busy bus can fail a read now and then.  Only a run of them means the
+    # register description is actually wrong.
+    _MAX_FAILURES = 3
+
     def __init__(self, stack, register, vendor, label):
         self._address = BASE_ADDRESS + stack
         self._register = register
         self._vendor = vendor
         self._label = label
         self._checks_left = 3
+        self._failures = 0
         self._enabled = (
             USE_DIRECT_BUS and smbus2 is not None and register is not None
         )
@@ -122,12 +127,21 @@ class _FastPort:
         try:
             value = _BUS.read_stable(self._address, self._register)
         except Exception as ex:  # noqa: BLE001 - any bus trouble at all
-            _LOGGER.warning(
-                "%s: direct read failed (%s); staying with the library",
-                self._label, ex,
-            )
-            self._enabled = False
+            self._failures += 1
+            if self._failures < self._MAX_FAILURES:
+                _LOGGER.debug(
+                    "%s: direct read failed (%s), using the library this time",
+                    self._label, ex,
+                )
+            else:
+                self._enabled = False
+                _LOGGER.warning(
+                    "%s: direct read failed %s times running (%s); staying "
+                    "with the library",
+                    self._label, self._failures, ex,
+                )
             return self._vendor()
+        self._failures = 0
         if self._checks_left:
             return self._checked(value)
         return value
@@ -217,7 +231,8 @@ class SMChannel:
             if self._get_all is not None
             else None
         )
-        # Some commands are fire and forget and have to be read back.
+        # Some commands are fire and forget and have to be read back.  Only
+        # on/off commands: the check below compares truthiness, not value.
         self._verify = bool(spec.get("verify"))
         self._configure(spec)
 
