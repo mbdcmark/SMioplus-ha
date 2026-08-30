@@ -13,7 +13,7 @@ from .data import SM_MAP
 from .entity import SMEntityMixin, async_setup_sm_platform
 
 PLATFORM = "button"
-SM_MAP = SM_MAP[PLATFORM]
+SM_MAP = SM_MAP.get(PLATFORM, {})
 
 _LOGGER = logging.getLogger(__name__)
 

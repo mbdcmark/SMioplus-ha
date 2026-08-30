@@ -11,7 +11,7 @@ from .data import SM_MAP
 from .entity import SMWritableEntity, async_setup_sm_platform
 
 PLATFORM = "switch"
-SM_MAP = SM_MAP[PLATFORM]
+SM_MAP = SM_MAP.get(PLATFORM, {})
 
 
 async def async_setup_platform(hass, config, add_devices, discovery_info=None):

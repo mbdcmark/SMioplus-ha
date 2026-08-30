@@ -97,37 +97,27 @@ SM_MAP = {
                 "register": 0,
         }
     },
-    "number": {
+    # Both analog outputs drive dimmers: the open drain channels are PWM, and
+    # 0-10V is what a 0-10V dimmer expects.  min_value and max_value are the
+    # ends of the brightness scale.
+    "light": {
         "dac": {
                 "chan_no": 4,
-                "uom": "V",
-                "device_class": "voltage",
                 "min_value": 0.0,
                 "max_value": 10.0,
-                "step": 0.01,
                 "com": {
                     "get": "getDacV",
                     "set": "setDacV"
                 },
-                "icon": {
-                    "on": "mdi:flash-triangle",
-                    "off": "mdi:flash-triangle"
-                }
         },
         "od": {
                 "chan_no": 4,
-                "uom": "%",
                 "min_value": 0.0,
                 "max_value": 100.0,
-                "step": 0.01,
                 "com": {
                     "get": "_fixed_getOdPwm",
                     "set": "_fixed_setOdPwm"
                 },
-                "icon": {
-                    "on": "mdi:percent",
-                    "off": "mdi:percent"
-                }
         },
     },
 }

@@ -126,8 +126,8 @@ SMioplus:
 Possible entities:
 ```yaml
 opto_cnt_rst_1: -> opto_cnt_rst_8:  (type: button)
-dac_1: -> dac_4:  (type: number)
-od_1: -> od_4:  (type: number)
+dac_1: -> dac_4:  (type: light)
+od_1: -> od_4:  (type: light)
 adc_1: -> adc_8:  (type: sensor)
 opto_cnt_1: -> opto_cnt_8:  (type: sensor)
 opto_1: -> opto_8:  (type: binary_sensor)
@@ -255,3 +255,20 @@ path retires itself with a line in the log. Any bus error does the same. Set
 
 Writes, and reads of anything without a `register`, still go through the
 library.
+
+
+### The analog outputs are dimmers
+
+The open drain channels are PWM and the DAC channels are 0-10V, which is what a
+0-10V dimmer expects, so both are lights rather than numbers. They behave the
+way any other dimmer does: switching one off writes zero to the card but
+remembers the level, and switching it back on returns to it. A light that has
+never been on comes up at full.
+
+The remembered level is published as a `brightness_when_on` attribute and read
+back at startup, so it survives a restart even when the light was off at the
+time and Home Assistant recorded no brightness of its own.
+
+`min_value` and `max_value` in `data.py` are the ends of the brightness scale --
+0..10 for the DACs, 0..100 for the open drains. To drive a channel by its raw
+value instead, move its block back under `"number"`.
