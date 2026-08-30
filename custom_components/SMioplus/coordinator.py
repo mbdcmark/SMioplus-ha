@@ -12,6 +12,7 @@ import time
 from datetime import timedelta
 from inspect import signature
 
+from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import BUS_SETTLE, READ_HOLD_SECONDS, READ_TOLERANCE
@@ -22,6 +23,13 @@ _LOGGER = logging.getLogger(__name__)
 # How often at most to complain that a sweep overran its interval.  Once ever
 # is too quiet: adding cards later changes the arithmetic.
 SLOW_WARN_EVERY = 300.0
+
+# DataUpdateCoordinator plans its next sweep at int(now) + interval, truncating
+# to whole seconds.  Below a second that lands in the past, the timer fires at
+# once, plans another moment in the past, and the card is read as fast as the
+# bus allows -- hundreds of times a second.  Anything this quick gets a timer
+# of our own instead.
+OWN_TIMER_BELOW = 1.0
 
 
 def async_get_coordinator(hass, stack, interval):
@@ -42,11 +50,12 @@ class SMCoordinator(DataUpdateCoordinator):
         # the task context.  This integration is YAML only, so say so.
         if "config_entry" in signature(DataUpdateCoordinator.__init__).parameters:
             kwargs["config_entry"] = None
+        self._own_timer = interval < OWN_TIMER_BELOW
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN} stack {stack} every {interval}s",
-            update_interval=timedelta(seconds=interval),
+            update_interval=None if self._own_timer else timedelta(seconds=interval),
             # Ten sweeps a second mostly read back what the last one did.
             # Waking every entity for an unchanged value is pure cost.
             always_update=False,
@@ -57,11 +66,27 @@ class SMCoordinator(DataUpdateCoordinator):
         self._channels = {}
         self._slow_warned_at = 0.0
         self._failures = {}
+        self._ticker = None
         self._sweep_lock = asyncio.Lock()
         # When the sweep now being reported started reading the card.  An
         # entity compares this against its own last write to tell a stale
         # answer from a current one.
         self.sweep_started = 0.0
+
+    @callback
+    def async_add_listener(self, update_callback, context=None):
+        remove = super().async_add_listener(update_callback, context)
+        if self._own_timer and self._ticker is None:
+            self._ticker = self.hass.async_create_background_task(
+                self._tick(), f"{DOMAIN} stack {self.stack} poller"
+            )
+        return remove
+
+    async def _tick(self):
+        """Our own timer, for intervals the coordinator cannot schedule."""
+        while True:
+            await asyncio.sleep(self.interval)
+            await self.async_refresh()
 
     def register(self, channel):
         """Include ``channel`` in every sweep from now on."""

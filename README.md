@@ -334,3 +334,16 @@ A channel that fails a read keeps its last value for `READ_TOLERANCE` sweeps or
 up. On the 0.1s opto poller that is three tenths of a second of holding still;
 on the 60s poller the time cap ends it, because three sweeps there would be
 three minutes of reporting a reading nobody took.
+
+
+### Polling faster than once a second
+
+`DataUpdateCoordinator` plans its next sweep at `int(now) + interval`, truncated
+to whole seconds. At an interval below one second that lands in the past, the
+timer fires at once, plans another moment in the past, and the card is read as
+fast as the bus allows -- hundreds of times a second, saturating the bus and a
+CPU core while the log insists it is polling at 0.1s.
+
+Intervals under a second are therefore driven by a timer of this integration's
+own, started with the first entity that listens. Everything else is left to the
+coordinator, which handles whole seconds correctly.
