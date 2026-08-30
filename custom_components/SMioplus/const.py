@@ -29,3 +29,7 @@ MIN_UPDATE_INTERVAL = 0.05
 # of ~0.35s under an eight channel sweep.  Raise it only if reads start failing
 # on a long or noisy bus.
 BUS_SETTLE = 0.0
+
+# Set False to make every read go through the vendor library, ignoring the
+# direct register path in api.py.
+USE_DIRECT_BUS = True

@@ -19,8 +19,13 @@ import logging
 import threading
 from inspect import signature
 
-from .const import COM_NOGET
-from .data import API, SM_MAP
+try:
+    import smbus2
+except ImportError:  # the vendor library depends on it, so this is unusual
+    smbus2 = None
+
+from .const import COM_NOGET, USE_DIRECT_BUS
+from .data import API, BASE_ADDRESS, I2C_BUS, SM_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,6 +45,124 @@ _TARGETS: dict[int, object] = {}
 
 class SMApiError(Exception):
     """The vendor library does not provide what the card description asks for."""
+
+
+class _Bus:
+    """One SMBus handle, held open for the life of the process.
+
+    The vendor library opens and closes /dev/i2c-N around every single call,
+    which costs far more than the transfer itself: eight opto channels measured
+    0.111s on a Pi 5 for what is one register read. Holding the handle open
+    puts that same read well under a millisecond, which is the difference
+    between one card and eight at a tenth of a second.
+    """
+
+    def __init__(self):
+        self._handle = None
+
+    def close(self):
+        handle, self._handle = self._handle, None
+        if handle is not None:
+            try:
+                handle.close()
+            except OSError:
+                pass
+
+    def read_stable(self, address, register, retries=10):
+        """Read until two reads agree, as the vendor library does.
+
+        The card can answer while it is updating the register, so a single
+        read is not trustworthy.
+        """
+        with BUS_LOCK:
+            try:
+                if self._handle is None:
+                    self._handle = smbus2.SMBus(I2C_BUS)
+                previous = None
+                for _ in range(retries):
+                    value = self._handle.read_byte_data(address, register)
+                    if value == previous:
+                        return value
+                    previous = value
+            except OSError:
+                # Drop the handle so the next call reopens it.
+                self.close()
+                raise
+        raise SMApiError(
+            f"register {register} at {address:#04x} never read the same twice"
+        )
+
+
+_BUS = _Bus()
+_PORTS = {}
+
+
+class _FastPort:
+    """A direct register read standing in for a vendor whole-port call.
+
+    Checked against the vendor call before it is trusted. If the two disagree
+    the register description is wrong for this card, and the fast path retires
+    itself rather than reporting fiction.
+    """
+
+    def __init__(self, stack, register, vendor, label):
+        self._address = BASE_ADDRESS + stack
+        self._register = register
+        self._vendor = vendor
+        self._label = label
+        self._checks_left = 3
+        self._enabled = (
+            USE_DIRECT_BUS and smbus2 is not None and register is not None
+        )
+
+    def read(self):
+        if not self._enabled:
+            return self._vendor()
+        try:
+            value = _BUS.read_stable(self._address, self._register)
+        except Exception as ex:  # noqa: BLE001 - any bus trouble at all
+            _LOGGER.warning(
+                "%s: direct read failed (%s); staying with the library",
+                self._label, ex,
+            )
+            self._enabled = False
+            return self._vendor()
+        if self._checks_left:
+            return self._checked(value)
+        return value
+
+    def _checked(self, value):
+        """Compare against the vendor call, allowing for a genuine change."""
+        try:
+            reference = self._vendor()
+        except Exception:  # noqa: BLE001 - nothing to compare against
+            return value
+        if reference == value:
+            self._checks_left = 0
+            _LOGGER.debug("%s: direct register read verified", self._label)
+            return value
+        self._checks_left -= 1
+        if not self._checks_left:
+            self._enabled = False
+            _LOGGER.warning(
+                "%s: direct read gave %s where the library gave %s, three "
+                "times over; staying with the library",
+                self._label, value, reference,
+            )
+        # Trust the library for as long as the two still disagree.
+        return reference
+
+
+def _fast_port(spec, stack, entity_type, vendor):
+    """The shared direct-read port for one entity type on one card."""
+    key = (stack, entity_type)
+    with BUS_LOCK:
+        if key not in _PORTS:
+            _PORTS[key] = _FastPort(
+                stack, spec.get("register"), vendor,
+                f"{entity_type} on stack {stack}",
+            )
+        return _PORTS[key]
 
 
 def _arity(func):
@@ -85,6 +208,13 @@ class SMChannel:
         # The arity check works this out on its own: getOpto(stack) takes no
         # channel, so it binds without one.
         self._get_all = self._bind_com(spec, "get_all", 0)
+        # Shared per entity type per card, so the check against the library
+        # happens once rather than eight times.
+        self._port = (
+            _fast_port(spec, stack, entity_type, self._get_all)
+            if self._get_all is not None
+            else None
+        )
         self._configure(spec)
 
     def __str__(self):
@@ -162,7 +292,7 @@ class SMChannel:
 
     def read_bulk(self):
         """Read the whole port. One result serves every channel of the type."""
-        return self._get_all()
+        return self._port.read()
 
     def decode(self, raw):
         """Pick this channel out of a whole-port read."""

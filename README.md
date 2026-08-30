@@ -223,3 +223,33 @@ The matching `opto_cnt_rst` button zeroes a channel.
 
 `init` is generic: any entity may name vendor calls that have to run once,
 before the channel will work.
+
+
+### The direct register path
+
+The vendor library opens and closes `/dev/i2c-1` around every single call. On a
+Pi 5 that made one register read cost about 14ms, which is why eight opto
+channels took 0.111s -- the transfer itself is a fraction of a millisecond. An
+Arduino driving eight of these cards at 0.1s is not doing anything clever; it
+simply keeps the bus open.
+
+So does this integration, for the whole-port reads. An entity that names a
+`register` is read straight from a `smbus2` handle held open for the life of
+the process, using the same read-until-two-agree the library does:
+
+```python
+"get_all": "getOpto",
+"register": 3,
+```
+
+The address and bus are `BASE_ADDRESS + stack` and `I2C_BUS` in `data.py`,
+mirroring the library's own constants.
+
+Hard-coded register numbers can go stale, so the fast path checks itself: the
+first few reads are compared against the vendor call, and the library's answer
+is the one reported until they agree. Three disagreements in a row and the fast
+path retires itself with a line in the log. Any bus error does the same. Set
+`USE_DIRECT_BUS = False` in `const.py` to switch it off outright.
+
+Writes, and reads of anything without a `register`, still go through the
+library.

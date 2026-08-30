@@ -12,6 +12,12 @@ MANUFACTURER = "Sequent Microsystems"
 import libioplus
 
 API = libioplus
+
+# Mirrors of the vendor library's own constants, used by the direct register
+# path in api.py.  It checks itself against the library before trusting them,
+# so a mismatch costs speed rather than correctness.
+I2C_BUS = 1
+BASE_ADDRESS = 0x28
 DOMAIN = "SMioplus"
 NAME_PREFIX = "smio"
 
@@ -42,6 +48,7 @@ SM_MAP = {
                     # a bit shift.
                     "get_all": "getOpto",
                 },
+                "register": 3,
                 "icon": {
                     "on": "mdi:numeric-1",
                     "off": "mdi:numeric-0",
@@ -87,6 +94,7 @@ SM_MAP = {
                     "get_all": "getRelays",
                     "set": "setRelayCh"
                 },
+                "register": 0,
         }
     },
     "number": {
