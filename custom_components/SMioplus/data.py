@@ -21,11 +21,21 @@ BASE_ADDRESS = 0x28
 DOMAIN = "SMioplus"
 NAME_PREFIX = "smio"
 
-# What to add to the stack level when naming entities.  The jumpers, the I2C
-# addresses and the `stack:` option all count cards from 0; with this at 1 the
-# entities are named smio1 to smio8 instead of smio0 to smio7.  Set it to 0 to
-# have the names match the jumpers again.
-NAME_STACK_OFFSET = 1
+# What to add to a stack level to get the card number people use.  The jumpers
+# and the I2C addresses count from 0 and always will; the `stack:` option, the
+# entity names and everything in the log count from 1, so the first card is
+# card 1.  Set this to 0 to count from 0 throughout, as the jumpers do.
+STACK_OFFSET = 1
+
+
+def card_from_stack(stack):
+    """The card number for a stack level -- what the user sees."""
+    return stack + STACK_OFFSET
+
+
+def stack_from_card(card):
+    """The stack level for a card number -- what the hardware sees."""
+    return card - STACK_OFFSET
 
 # Stack levels selectable with the card's jumpers.
 MIN_STACK = 0

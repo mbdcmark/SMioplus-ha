@@ -24,7 +24,7 @@ from .const import (
     WRITE_SETTLE,
 )
 from .coordinator import async_get_coordinator
-from .data import DOMAIN, NAME_PREFIX, NAME_STACK_OFFSET, SM_MAP
+from .data import DOMAIN, NAME_PREFIX, SM_MAP, card_from_stack
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,14 +91,16 @@ class SMPortWriter:
             if got & mask == wanted & mask:
                 if attempt > 1:
                     _LOGGER.warning(
-                        "%s port on stack %s needed %s attempts",
-                        channel.entity_type, channel.stack, attempt,
+                        "%s port on card %s needed %s attempts",
+                        channel.entity_type, card_from_stack(channel.stack),
+                        attempt,
                     )
                 return
             time.sleep(WRITE_SETTLE * attempt)
 
         raise SMApiError(
-            f"{channel.entity_type} port on stack {channel.stack} still reads "
+            f"{channel.entity_type} port on card {card_from_stack(channel.stack)} "
+            f"still reads "
             f"{got:#04x} after {WRITE_ATTEMPTS} attempts to write {wanted:#04x}"
         )
 
@@ -130,7 +132,10 @@ async def async_setup_sm_platform(
         # description and the library disagree, OSError when the card is not
         # on the bus.  Either way, skip this entity instead of failing the
         # whole platform.
-        _LOGGER.error("Skipping %s_%s on stack %s: %s", entity_type, chan, stack, err)
+        _LOGGER.error(
+            "Skipping %s_%s on card %s: %s",
+            entity_type, chan, card_from_stack(stack), err,
+        )
         return
 
     if not polled:
@@ -167,7 +172,7 @@ class SMEntityMixin:
             f"{DOMAIN}_{channel.stack}_{channel.entity_type}_{channel.chan}"
         )
         self._attr_name = name or (
-            f"{NAME_PREFIX}{channel.stack + NAME_STACK_OFFSET}"
+            f"{NAME_PREFIX}{card_from_stack(channel.stack)}"
             f"_{channel.entity_type}_{channel.chan}"
         )
         # No device_info on purpose.  Home Assistant only lets an entity join

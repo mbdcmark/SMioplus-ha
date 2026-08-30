@@ -22,7 +22,8 @@ from .const import (  # noqa: F401  (re-exported for compatibility)
 
 DOMAIN = data.DOMAIN
 NAME_PREFIX = data.NAME_PREFIX
-NAME_STACK_OFFSET = data.NAME_STACK_OFFSET
+card_from_stack = data.card_from_stack
+stack_from_card = data.stack_from_card
 SM_MAP = data.SM_MAP
 SM_API = data.API
 PLATFORM_FOR_TYPE = data.PLATFORM_FOR_TYPE
@@ -43,8 +44,12 @@ ENTITY_SCHEMA = vol.Schema(
 # spelled out here; they are validated against SM_MAP in async_setup instead.
 CARD_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_STACK, default=data.MIN_STACK): vol.All(
-            vol.Coerce(int), vol.Range(min=data.MIN_STACK, max=data.MAX_STACK)
+        vol.Optional(CONF_STACK, default=card_from_stack(data.MIN_STACK)): vol.All(
+            vol.Coerce(int),
+            vol.Range(
+                min=card_from_stack(data.MIN_STACK),
+                max=card_from_stack(data.MAX_STACK),
+            ),
         ),
     },
     extra=vol.ALLOW_EXTRA,
@@ -58,7 +63,7 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 def _entity_name(stack, entity_type, chan):
-    return f"{NAME_PREFIX}{stack + NAME_STACK_OFFSET}_{entity_type}_{chan}"
+    return f"{NAME_PREFIX}{card_from_stack(stack)}_{entity_type}_{chan}"
 
 
 def _discovery_info(stack, entity_type, chan, update_interval):
@@ -188,7 +193,10 @@ async def async_setup(hass, config):
     for card_config in card_configs:
         # Copy: this is Home Assistant's config object, not ours to edit.
         card_config = dict(card_config)
-        stack = int(card_config.pop(CONF_STACK, data.MIN_STACK))
+        # `stack:` is a card number; the hardware counts from zero.
+        stack = stack_from_card(
+            int(card_config.pop(CONF_STACK, card_from_stack(data.MIN_STACK)))
+        )
         if not card_config:
             _load_whole_card(hass, config, stack)
             continue

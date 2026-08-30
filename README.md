@@ -77,40 +77,40 @@ SMioplus:
     # + optional configs
 ```
 
-- Simple stack 0 config:
+- Simple first card config:
 
 ```yaml
 SMioplus:
 ```
 
-- Specific stack config:
+- One specific card:
 
 ```yaml
 SMioplus:
-    - stack: 2
-```
-
-- Multiple cards on different stack levels:
-
-```yaml
-SMioplus:
-    - stack: 0
-    - stack: 2
     - stack: 3
 ```
 
-- Only specific entities for different stack levels:
+- Several cards:
+
+```yaml
+SMioplus:
+    - stack: 1
+    - stack: 3
+    - stack: 4
+```
+
+- Only specific entities, per card:
 
 > !The following example is provided for illustrative purposes only and does NOT necessarily represent real entities!
 
 ```yaml
 SMioplus:
-    - stack: 0
+    - stack: 1
       relay_1:
       relay_3:
       opto_1:
         update_interval: 0.1
-    - stack: 2
+    - stack: 3
       relay:
         chan_range: "1..8"
       opto_cnt:
@@ -123,14 +123,15 @@ SMioplus:
 
 ### Card numbering
 
-The jumpers, the I2C addresses and the `stack:` option all count cards from 0.
-The entities are named from 1: the card on stack 0 gives `smio1_relay_1`, and
-the card on stack 7 gives `smio8_relay_1`. `NAME_STACK_OFFSET` in `data.py` is
-what does that; set it to 0 to have the names match the jumpers again.
+Cards count from 1 everywhere you look: `stack: 1` is the first card, its
+entities are `smio1_relay_1` and so on, and the log calls it card 1. The
+jumpers and the I2C addresses count from 0, because that is what the hardware
+does, and nothing else asks you to.
 
-Log messages name the stack level, not the entity prefix, because they are
-about the hardware -- a complaint about "stack 0" is about the card named
-`smio1`.
+So the first card has its jumpers set to level 0 and is written `stack: 1`;
+the eighth is at level 7 and is written `stack: 8`. `STACK_OFFSET` in `data.py`
+is the single place that decides this -- set it to 0 to count from 0
+throughout, as the jumpers do.
 
 ### `configuration.yaml` entities
 
@@ -156,7 +157,7 @@ just `relay:` -- means every channel that type has.
 
 `chan_range` and `channels` are alternatives; when both are given, `channels`
 wins. Channels the card does not have are reported in the log and skipped, as
-are unknown entity names and stack levels outside 0..7.
+are unknown entity names and card numbers outside 1..8.
 
 Entities are not grouped under a device. Home Assistant only lets an entity
 join the device registry by way of a config entry, and this integration is
@@ -204,7 +205,7 @@ To choose an interval yourself, name the entity and say so:
 
 ```yaml
 SMioplus:
-    - stack: 0
+    - stack: 1
       adc:
         update_interval: 5
       opto:
@@ -264,7 +265,8 @@ the process, using the same read-until-two-agree the library does:
 "register": 3,
 ```
 
-The address and bus are `BASE_ADDRESS + stack` and `I2C_BUS` in `data.py`,
+The address and bus are `BASE_ADDRESS + stack` and `I2C_BUS` in `data.py`, the
+stack being the jumper level rather than the card number,
 mirroring the library's own constants.
 
 Hard-coded register numbers can go stale, so the fast path checks itself: the

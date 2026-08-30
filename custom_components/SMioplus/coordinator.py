@@ -16,7 +16,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import BUS_SETTLE, READ_HOLD_SECONDS, READ_TOLERANCE
-from .data import DOMAIN
+from .data import DOMAIN, card_from_stack
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class SMCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN} stack {stack} every {interval}s",
+            name=f"{DOMAIN} card {card_from_stack(stack)} every {interval}s",
             update_interval=None if self._own_timer else timedelta(seconds=interval),
             # Ten sweeps a second mostly read back what the last one did.
             # Waking every entity for an unchanged value is pure cost.
@@ -78,7 +78,7 @@ class SMCoordinator(DataUpdateCoordinator):
         remove = super().async_add_listener(update_callback, context)
         if self._own_timer and self._ticker is None:
             self._ticker = self.hass.async_create_background_task(
-                self._tick(), f"{DOMAIN} stack {self.stack} poller"
+                self._tick(), f"{DOMAIN} card {card_from_stack(self.stack)} poller"
             )
         return remove
 
@@ -107,8 +107,8 @@ class SMCoordinator(DataUpdateCoordinator):
         except Exception as ex:  # noqa: BLE001 - the vendor library raises bare
             # OSError/IOError on bus trouble.
             _LOGGER.error(
-                "Reading all %s on stack %s failed: %s",
-                channel.entity_type, channel.stack, ex,
+                "Reading all %s on card %s failed: %s",
+                channel.entity_type, card_from_stack(channel.stack), ex,
             )
             return None
 
@@ -185,16 +185,17 @@ class SMCoordinator(DataUpdateCoordinator):
                 values[key] = value
 
         if values and all(value is None for value in values.values()):
-            raise UpdateFailed(f"Card on stack {self.stack} did not answer")
+            raise UpdateFailed(f"Card {card_from_stack(self.stack)} did not answer")
 
         elapsed = time.monotonic() - started
         if elapsed > self.interval and started - self._slow_warned_at > SLOW_WARN_EVERY:
             # Rate limited: at a tenth of a second this would flood the log.
             self._slow_warned_at = started
             _LOGGER.warning(
-                "Reading %s channel(s) on stack %s took %.3fs in %s bus "
+                "Reading %s channel(s) on card %s took %.3fs in %s bus "
                 "transaction(s), longer than the %.3fs interval asked for. "
                 "Raise update_interval or poll fewer channels.",
-                len(values), self.stack, elapsed, transactions, self.interval,
+                len(values), card_from_stack(self.stack), elapsed, transactions,
+                self.interval,
             )
         return values
