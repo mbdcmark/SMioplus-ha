@@ -313,10 +313,11 @@ bits applied, the whole byte written, and the result read back and retried the
 way a single write is. The relays then switch together, and eight cards cost
 eight transactions rather than sixty-four.
 
-A single switch waits the same window before anything happens. Home Assistant
-fires the eight service calls in one event loop tick, so they are all queued
-long before it expires; the window only has to survive the scheduling, which is
-why it is 10ms rather than something a person could feel. Types without a `set_all` -- the dimmers -- are written
+The window is zero. Home Assistant fires the eight service calls in one event
+loop tick, so handing the loop back once already finds them queued -- waiting
+any longer would buy nothing and delay every single switch by that much. If the
+calls ever arrive spread out the batch splits into two writes, which is what
+happened before batching existed. Types without a `set_all` -- the dimmers -- are written
 one at a time as before.
 
 
