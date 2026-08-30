@@ -225,8 +225,11 @@ in a sweep of their own rather than dragging the other forty along.
 
 The bus lock serialises transactions, so there is no artificial wait between
 them and eight channels read in a few milliseconds; 0.1 second intervals are
-workable. If a sweep does overrun its interval the log says so once, naming the
-measured time. Should reads start failing on a long or noisy bus, raise
+workable. If a sweep overruns its interval the log says so, naming the measured
+time and how many bus transactions it took -- but not for the first half minute
+after starting, when binding 384 channels, configuring the edge counters and
+reading the revisions puts well over a second of traffic on the bus that a fast
+poller has to wait behind. Should reads start failing on a long or noisy bus, raise
 `BUS_SETTLE` in `custom_components/SMioplus/const.py`.
 
 

@@ -24,6 +24,12 @@ _LOGGER = logging.getLogger(__name__)
 # is too quiet: adding cards later changes the arithmetic.
 SLOW_WARN_EVERY = 300.0
 
+# ...and not at all for this long after the first sweep.  Starting up binds
+# every channel, configures the edge counters and reads the revisions -- well
+# over a second of bus traffic that a fast poller has to wait behind.  That is
+# not the interval being unachievable, which is what the warning is about.
+SLOW_WARN_GRACE = 30.0
+
 # DataUpdateCoordinator plans its next sweep at int(now) + interval, truncating
 # to whole seconds.  Below a second that lands in the past, the timer fires at
 # once, plans another moment in the past, and the card is read as fast as the
@@ -65,6 +71,7 @@ class SMCoordinator(DataUpdateCoordinator):
         self.interval = interval
         self._channels = {}
         self._slow_warned_at = 0.0
+        self._first_sweep_at = 0.0
         self._failures = {}
         self._ticker = None
         self._sweep_lock = asyncio.Lock()
@@ -187,8 +194,15 @@ class SMCoordinator(DataUpdateCoordinator):
         if values and all(value is None for value in values.values()):
             raise UpdateFailed(f"Card {card_from_stack(self.stack)} did not answer")
 
+        if not self._first_sweep_at:
+            self._first_sweep_at = started
+
         elapsed = time.monotonic() - started
-        if elapsed > self.interval and started - self._slow_warned_at > SLOW_WARN_EVERY:
+        if (
+            elapsed > self.interval
+            and started - self._first_sweep_at > SLOW_WARN_GRACE
+            and started - self._slow_warned_at > SLOW_WARN_EVERY
+        ):
             # Rate limited: at a tenth of a second this would flood the log.
             self._slow_warned_at = started
             _LOGGER.warning(
