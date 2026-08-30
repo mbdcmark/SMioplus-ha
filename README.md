@@ -290,3 +290,20 @@ moment after each write, so the firmware has acted before anything else reaches
 it. It is per card, not bus wide: writing to one card does not hold up reading
 the others, which matters when eight of them are being polled ten times a
 second. Raise it if the log starts reporting retries.
+
+
+### Batched relay writes
+
+Home Assistant calls `turn_on` and `turn_off` one entity at a time, so
+switching eight relays used to arrive as eight separate transactions and they
+closed in a visible cascade.
+
+An entity type that names a `set_all` command has its writes gathered over
+`BATCH_WINDOW` and sent as a single transaction: the port is read, the pending
+bits applied, the whole byte written, and the result read back and retried the
+way a single write is. The relays then switch together, and eight cards cost
+eight transactions rather than sixty-four.
+
+A single switch waits the same window before anything happens, which is 50ms
+and not worth noticing. Types without a `set_all` -- the dimmers -- are written
+one at a time as before.

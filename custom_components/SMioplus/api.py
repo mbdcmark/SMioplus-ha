@@ -261,6 +261,7 @@ class SMChannel:
         # The arity check works this out on its own: getOpto(stack) takes no
         # channel, so it binds without one.
         self._get_all = self._bind_com(spec, "get_all", 0)
+        self._set_all = self._bind_com(spec, "set_all", 1, settle=WRITE_SETTLE)
         # Shared per entity type per card, so the check against the library
         # happens once rather than eight times.
         self._port = (
@@ -354,6 +355,19 @@ class SMChannel:
     def read_bulk(self):
         """Read the whole port. One result serves every channel of the type."""
         return self._port.read()
+
+    @property
+    def batchable(self):
+        """Whether the whole port can be written in one transaction."""
+        return self._set_all is not None and self._port is not None
+
+    def read_port(self):
+        """The port as a raw byte, one bit per channel."""
+        return int(self._port.read())
+
+    def write_port(self, value):
+        """Write the whole port at once."""
+        return self._set_all(int(value))
 
     def decode(self, raw):
         """Pick this channel out of a whole-port read."""

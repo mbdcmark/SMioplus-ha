@@ -4,25 +4,103 @@ This replaces the near-identical copies of the setup and API binding code that
 used to live in each platform module.
 """
 
+import asyncio
 import logging
 import time
 
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import SMChannel
+from .api import SMApiError, SMChannel
 from .const import (
+    BATCH_WINDOW,
     CONF_CHAN,
     CONF_NAME,
     CONF_STACK,
     CONF_TYPE,
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL,
+    WRITE_ATTEMPTS,
+    WRITE_SETTLE,
 )
 from .coordinator import async_get_coordinator
 from .data import DOMAIN, NAME_PREFIX, SM_MAP
 
 _LOGGER = logging.getLogger(__name__)
+
+# One writer per port per card, shared by that port's entities.
+_WRITERS = {}
+
+
+def _port_writer(hass, channel):
+    """The batching writer for this channel's port, if it has one."""
+    if not channel.batchable:
+        return None
+    key = (channel.stack, channel.entity_type)
+    if key not in _WRITERS:
+        _WRITERS[key] = SMPortWriter(hass, channel)
+    return _WRITERS[key]
+
+
+class SMPortWriter:
+    """Collects a card's channel writes and sends them as one byte.
+
+    Home Assistant calls turn_on and turn_off one entity at a time, so
+    switching eight relays arrived as eight separate transactions and they
+    closed in a visible cascade.  Gathering them over a short window turns
+    that into a single write, and the relays switch together.
+    """
+
+    def __init__(self, hass, channel):
+        self.hass = hass
+        self._channel = channel
+        self._pending = {}
+        self._flush = None
+        self._gate = asyncio.Lock()
+
+    async def set(self, chan, value):
+        """Ask for one channel, and wait for the write that carries it."""
+        async with self._gate:
+            self._pending[chan] = value
+            if self._flush is None:
+                self._flush = self.hass.async_create_task(self._run())
+            flush = self._flush
+        await flush
+
+    async def _run(self):
+        await asyncio.sleep(BATCH_WINDOW)
+        async with self._gate:
+            # Anything arriving from here on belongs to the next write.
+            pending, self._pending = self._pending, {}
+            self._flush = None
+        await self.hass.async_add_executor_job(self._write, pending)
+
+    def _write(self, pending):
+        """Read the port, apply the changes, write it back, check it took."""
+        channel = self._channel
+        wanted = channel.read_port()
+        mask = 0
+        for chan, value in pending.items():
+            bit = 1 << (chan - 1)
+            mask |= bit
+            wanted = wanted | bit if value else wanted & ~bit
+
+        for attempt in range(1, WRITE_ATTEMPTS + 1):
+            channel.write_port(wanted)
+            got = channel.read_port()
+            if got & mask == wanted & mask:
+                if attempt > 1:
+                    _LOGGER.warning(
+                        "%s port on stack %s needed %s attempts",
+                        channel.entity_type, channel.stack, attempt,
+                    )
+                return
+            time.sleep(WRITE_SETTLE * attempt)
+
+        raise SMApiError(
+            f"{channel.entity_type} port on stack {channel.stack} still reads "
+            f"{got:#04x} after {WRITE_ATTEMPTS} attempts to write {wanted:#04x}"
+        )
 
 
 async def async_setup_sm_platform(
@@ -152,7 +230,14 @@ class SMWritableEntity(SMPolledEntity):
 
     async def _sm_write(self, *values):
         try:
-            await self.hass.async_add_executor_job(self._sm_channel.set, *values)
+            writer = _port_writer(self.hass, self._sm_channel)
+            if writer is not None and len(values) == 1:
+                # Batched with whatever else is switching on this card.
+                await writer.set(self._sm_channel.chan, values[0])
+            else:
+                await self.hass.async_add_executor_job(
+                    self._sm_channel.set, *values
+                )
         except Exception as ex:  # noqa: BLE001 - the vendor library raises bare
             # OSError/IOError on bus trouble.
             _LOGGER.error("Writing %s failed: %s", self._sm_channel, ex)

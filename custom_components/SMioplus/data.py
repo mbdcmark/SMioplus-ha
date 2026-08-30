@@ -92,7 +92,10 @@ SM_MAP = {
                 "com": {
                     "get": "getRelayCh",
                     "get_all": "getRelays",
-                    "set": "setRelayCh"
+                    "set": "setRelayCh",
+                    # The whole port in one transaction, so eight relays
+                    # switch together instead of in a cascade.
+                    "set_all": "setRelays"
                 },
                 "register": 0,
                 # setRelayCh writes to a set/clear register and the card

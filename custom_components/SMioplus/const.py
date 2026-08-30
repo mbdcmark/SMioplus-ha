@@ -45,3 +45,10 @@ WRITE_SETTLE = 0.01
 # set/clear registers are fire and forget: the card acknowledges the I2C
 # transfer, not the switching, so a lost command is silent.
 WRITE_ATTEMPTS = 3
+
+# Seconds to gather channel writes before sending them as one transaction.
+# Home Assistant calls turn_on and turn_off one entity at a time, so switching
+# eight relays arrives as eight calls; waiting this long turns them into a
+# single write and they switch together.  Long enough to catch the batch,
+# short enough not to be felt on a single switch.
+BATCH_WINDOW = 0.05
