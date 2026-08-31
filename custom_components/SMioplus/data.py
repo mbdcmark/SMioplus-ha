@@ -98,7 +98,10 @@ SM_MAP = {
                 "uom": "V",
                 "device_class": "voltage",
                 "state_class": "measurement",
-                # 12-bit over 0..10V, so millivolts are meaningful.
+                # Inputs measure 0..3.3V and the library reports millivolts,
+                # so three decimals are meaningful.  Note each input carries a
+                # 15k pull-up to 3.3V: they are the top half of a divider,
+                # meant for 10K thermistors, not a neutral voltmeter.
                 "precision": 3,
                 "com": {
                     "get": "getAdcV",

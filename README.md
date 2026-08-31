@@ -423,3 +423,18 @@ and the coordinator still reports a card that answers nothing at all.
 
 `[Errno 2] No such file or directory: '/dev/i2c-1'` means I2C is not enabled on
 the machine, not that a card is missing: nothing reached the bus at all.
+
+
+### What the analog inputs actually are
+
+The eight inputs measure 0 to 3.3V and each carries a 15k pull-up to 3.3V, so
+they are the top half of a divider rather than a neutral voltmeter -- built for
+10K thermistors, which is what the card is sold to do.
+
+Two things follow. A 0-10V transmitter must not be wired to one: 3.3V is the
+maximum and the datasheet says so in the diagram. And any sensor driving an
+input shares it with that pull-up, which shifts the reading unless it is
+accounted for.
+
+The DAC and open drain outputs are a different matter: those really are 0-10V,
+and `setDacV` clamps to it.
