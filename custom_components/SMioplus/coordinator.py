@@ -72,6 +72,7 @@ class SMCoordinator(DataUpdateCoordinator):
         self._channels = {}
         self._slow_warned_at = 0.0
         self._first_sweep_at = 0.0
+        self._reported = set()
         self._failures = {}
         self._ticker = None
         self._sweep_lock = asyncio.Lock()
@@ -107,17 +108,36 @@ class SMCoordinator(DataUpdateCoordinator):
         async with self._sweep_lock:
             return await self.hass.async_add_executor_job(self._read_all)
 
+    def _report(self, key, what, ex):
+        """Say a read failed, once, however long it keeps failing.
+
+        A card that is not there fails every sweep, and at ten sweeps a second
+        across eight cards that is tens of thousands of identical lines.
+        """
+        if key in self._reported:
+            return
+        self._reported.add(key)
+        _LOGGER.error("Reading %s failed: %s", what, ex)
+
+    def _recovered(self, key, what):
+        if key in self._reported:
+            self._reported.discard(key)
+            _LOGGER.info("Reading %s works again", what)
+
     def _read_bulk(self, channel):
         """One whole-port read, or None if it failed."""
+        what = (
+            f"all {channel.entity_type} on card "
+            f"{card_from_stack(channel.stack)}"
+        )
         try:
-            return channel.read_bulk()
+            value = channel.read_bulk()
         except Exception as ex:  # noqa: BLE001 - the vendor library raises bare
             # OSError/IOError on bus trouble.
-            _LOGGER.error(
-                "Reading all %s on card %s failed: %s",
-                channel.entity_type, card_from_stack(channel.stack), ex,
-            )
+            self._report(("port", channel.entity_type), what, ex)
             return None
+        self._recovered(("port", channel.entity_type), what)
+        return value
 
     def _hold(self, key, channel, previous, now):
         """Keep the last good value for a while before giving up on it."""
@@ -182,12 +202,13 @@ class SMCoordinator(DataUpdateCoordinator):
                     value = channel.get()
             except Exception as ex:  # noqa: BLE001 - one bad channel must not
                 # take the rest of the card down with it.
-                _LOGGER.error("Reading %s failed: %s", channel, ex)
+                self._report(key, str(channel), ex)
                 failed = True
 
             if failed:
                 values[key] = self._hold(key, channel, previous, started)
             else:
+                self._recovered(key, str(channel))
                 self._failures.pop(key, None)
                 values[key] = value
 

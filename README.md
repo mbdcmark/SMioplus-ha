@@ -409,3 +409,17 @@ file with:
 ```yaml
 SMioplus: !include sequent.yaml
 ```
+
+
+### When a card is not there
+
+A missing card, or an I2C bus that was never enabled, fails every read. At ten
+sweeps a second across eight cards that is tens of thousands of identical log
+lines an hour, which buries whatever else went wrong.
+
+A failed read is reported once and then not again until it succeeds, at which
+point the log says so. The entity still goes unavailable on its own schedule,
+and the coordinator still reports a card that answers nothing at all.
+
+`[Errno 2] No such file or directory: '/dev/i2c-1'` means I2C is not enabled on
+the machine, not that a card is missing: nothing reached the bus at all.
